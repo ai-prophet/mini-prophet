@@ -15,9 +15,9 @@ from exa_py import Exa
 
 from miniprophet.environment.source_board import Source
 from miniprophet.exceptions import SearchAuthError, SearchNetworkError, SearchRateLimitError
-from miniprophet.search import SearchResult
+from miniprophet.tools.search import SearchResult
 
-logger = logging.getLogger("miniprophet.search.exa")
+logger = logging.getLogger("miniprophet.tools.search.exa")
 
 CONTENT_NOT_AVAILABLE = "content not available"
 EXA_SEARCH_PARAMETERS_SCHEMA: dict[str, Any] = {
@@ -38,8 +38,8 @@ EXA_SEARCH_PARAMETERS_SCHEMA: dict[str, Any] = {
 }
 
 
-class ExaSearchTool:
-    """Search tool backed by the Exa Python SDK."""
+class ExaSearchBackend:
+    """Search backend backed by the Exa Python SDK."""
 
     search_parameters_schema = EXA_SEARCH_PARAMETERS_SCHEMA
 

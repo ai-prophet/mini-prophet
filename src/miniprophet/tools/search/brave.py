@@ -15,9 +15,9 @@ import trafilatura
 
 from miniprophet.environment.source_board import Source
 from miniprophet.exceptions import SearchAuthError, SearchNetworkError, SearchRateLimitError
-from miniprophet.search import SearchResult
+from miniprophet.tools.search import SearchResult
 
-logger = logging.getLogger("miniprophet.search.brave")
+logger = logging.getLogger("miniprophet.tools.search.brave")
 
 BRAVE_API_ENDPOINT = "https://api.search.brave.com/res/v1/web/search"
 BRAVE_SEARCH_PARAMETERS_SCHEMA: dict[str, Any] = {
@@ -40,8 +40,8 @@ BRAVE_SEARCH_PARAMETERS_SCHEMA: dict[str, Any] = {
 }
 
 
-class BraveSearchTool:
-    """Search tool backed by the Brave Search API + trafilatura content extraction."""
+class BraveSearchBackend:
+    """Search backend backed by the Brave Search API + trafilatura content extraction."""
 
     search_parameters_schema = BRAVE_SEARCH_PARAMETERS_SCHEMA
 

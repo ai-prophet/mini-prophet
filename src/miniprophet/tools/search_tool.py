@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 from miniprophet.environment.source_board import Source
 from miniprophet.exceptions import SearchAuthError, SearchError
-from miniprophet.search import SearchResult, SearchTool
+from miniprophet.tools.search import SearchBackend, SearchResult
 
 logger = logging.getLogger("miniprophet.tools.search")
 
@@ -45,11 +45,11 @@ class SearchToolConfig(BaseModel):
 
 
 class SearchForecastTool:
-    """Wraps a SearchTool backend into a forecast Tool with source ID tracking."""
+    """Wraps a SearchBackend into a forecast Tool with source ID tracking."""
 
     def __init__(
         self,
-        search_backend: SearchTool,
+        search_backend: SearchBackend,
         source_registry: dict[str, Source],
         *,
         search_limit: int = 10,

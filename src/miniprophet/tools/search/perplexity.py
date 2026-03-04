@@ -20,9 +20,9 @@ from miniprophet.exceptions import (
     SearchNetworkError,
     SearchRateLimitError,
 )
-from miniprophet.search import SearchResult
+from miniprophet.tools.search import SearchResult
 
-logger = logging.getLogger("miniprophet.search.perplexity")
+logger = logging.getLogger("miniprophet.tools.search.perplexity")
 
 # pricing from: https://docs.perplexity.ai/docs/getting-started/pricing
 PERPLEXITY_PER_SEARCH_COST = 5 / 1000
@@ -50,8 +50,8 @@ PERPLEXITY_SEARCH_PARAMETERS_SCHEMA: dict[str, Any] = {
 }
 
 
-class PerplexitySearchTool:
-    """Search tool backed by the Perplexity Search API.
+class PerplexitySearchBackend:
+    """Search backend backed by the Perplexity Search API.
 
     Perplexity returns ranked web results with substantial extracted content
     already included in the snippet field, so no additional scraping is needed.

@@ -17,13 +17,13 @@ Main extension interfaces are Protocol-based and live in `src/miniprophet/__init
 
 ## 1. Custom search backend
 
-Implement the `SearchTool` protocol (`search`, `serialize`).
+Implement the `SearchBackend` protocol (`search`, `serialize`).
 
 ```python
 from miniprophet.environment.source_board import Source
-from miniprophet.search import SearchResult
+from miniprophet.tools.search import SearchResult
 
-class MySearchTool:
+class MySearchBackend:
     # Optional: override search tool schema shown to the model
     search_parameters_schema = {
         "type": "object",
@@ -48,7 +48,7 @@ class MySearchTool:
 
 Two common approaches:
 
-- add it to `_SEARCH_CLASS_MAPPING` in `src/miniprophet/search/__init__.py`
+- add it to `_SEARCH_CLASS_MAPPING` in `src/miniprophet/tools/search/__init__.py`
 - or pass a fully-qualified class path via config `search.search_class=<module.ClassName>`
 
 Current search config shape supports nested backend config:

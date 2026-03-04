@@ -66,7 +66,7 @@ def main(
     from miniprophet.environment.forecast_env import ForecastEnvironment, create_default_tools
     from miniprophet.environment.source_board import SourceBoard
     from miniprophet.models import get_model
-    from miniprophet.search import get_search_tool
+    from miniprophet.tools.search import get_search_backend
 
     print_cli_banner(__version__, mode_label="single run")
 
@@ -129,7 +129,7 @@ def main(
         model = get_model(config=config.get("model", {}))
 
         search_cfg = config.get("search", {})
-        search_backend = get_search_tool(search_cfg=search_cfg)
+        search_backend = get_search_backend(search_cfg=search_cfg)
 
         agent_search_limit = config.get("agent", {}).get("search_limit", 10)
         board = SourceBoard()

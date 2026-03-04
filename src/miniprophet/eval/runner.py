@@ -243,7 +243,7 @@ def process_problem(
     from miniprophet.environment.forecast_env import ForecastEnvironment, create_default_tools
     from miniprophet.environment.source_board import SourceBoard
     from miniprophet.models import get_model
-    from miniprophet.search import get_search_tool
+    from miniprophet.tools.search import get_search_backend
 
     task_id = problem.task_id
     run_dir = args.output_dir / "runs" / task_id
@@ -265,7 +265,7 @@ def process_problem(
 
         model = get_model(config=args.config.get("model", {}))
         search_cfg = args.config.get("search", {})
-        search_backend = get_search_tool(search_cfg=search_cfg)
+        search_backend = get_search_backend(search_cfg=search_cfg)
 
         agent_cfg = args.config.get("agent", {})
         agent_search_limit = int(agent_cfg.get("search_limit", 10) or 10)

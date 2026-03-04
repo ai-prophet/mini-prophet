@@ -5,8 +5,8 @@ import types
 import pytest
 
 from miniprophet.exceptions import SearchNetworkError
-from miniprophet.search import get_search_tool
-from miniprophet.search.exa import ExaSearchTool
+from miniprophet.tools.search import get_search_backend
+from miniprophet.tools.search.exa import ExaSearchBackend
 
 
 class _KwOnlySearch:
@@ -45,7 +45,7 @@ def patch_search_module(monkeypatch: pytest.MonkeyPatch):
 
 def test_get_search_tool_filters_kwargs_without_varkw(patch_search_module) -> None:
     class_path = f"{patch_search_module.__name__}.KwOnlySearch"
-    tool = get_search_tool(
+    tool = get_search_backend(
         {
             "search_class": class_path,
             class_path: {"keep": 3, "drop": 9},
@@ -57,7 +57,7 @@ def test_get_search_tool_filters_kwargs_without_varkw(patch_search_module) -> No
 
 def test_get_search_tool_passes_all_kwargs_with_varkw(patch_search_module) -> None:
     class_path = f"{patch_search_module.__name__}.VarKwSearch"
-    tool = get_search_tool(
+    tool = get_search_backend(
         {
             "search_class": class_path,
             class_path: {"a": 1, "b": 2},
@@ -69,19 +69,20 @@ def test_get_search_tool_passes_all_kwargs_with_varkw(patch_search_module) -> No
 
 def test_get_search_tool_raises_on_unknown_class() -> None:
     with pytest.raises(ValueError, match="Unknown search class"):
-        get_search_tool({"search_class": "missing.module.Class"})
+        get_search_backend({"search_class": "missing.module.Class"})
 
 
 def test_exa_date_mmddyyyy_to_iso_start_and_end() -> None:
     assert (
-        ExaSearchTool._date_mmddyyyy_to_iso("01/02/2026", end_of_day=False)
+        ExaSearchBackend._date_mmddyyyy_to_iso("01/02/2026", end_of_day=False)
         == "2026-01-02T00:00:00Z"
     )
     assert (
-        ExaSearchTool._date_mmddyyyy_to_iso("01/02/2026", end_of_day=True) == "2026-01-02T23:59:59Z"
+        ExaSearchBackend._date_mmddyyyy_to_iso("01/02/2026", end_of_day=True)
+        == "2026-01-02T23:59:59Z"
     )
 
 
 def test_exa_date_mmddyyyy_to_iso_rejects_invalid_date() -> None:
     with pytest.raises(SearchNetworkError, match="Expected MM/DD/YYYY"):
-        ExaSearchTool._date_mmddyyyy_to_iso("2026-01-02", end_of_day=False)
+        ExaSearchBackend._date_mmddyyyy_to_iso("2026-01-02", end_of_day=False)

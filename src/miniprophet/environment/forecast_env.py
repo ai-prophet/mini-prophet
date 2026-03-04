@@ -10,13 +10,13 @@ from pydantic import BaseModel
 
 from miniprophet import Tool
 from miniprophet.environment.source_board import Source, SourceBoard
-from miniprophet.search import SearchTool
+from miniprophet.tools.search import SearchBackend
 
 logger = logging.getLogger("miniprophet.environment")
 
 
 def create_default_tools(
-    search_tool: SearchTool,
+    search_tool: SearchBackend,
     outcomes: list[str],
     board: SourceBoard,
     *,

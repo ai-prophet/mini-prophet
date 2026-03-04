@@ -1,4 +1,4 @@
-"""Search tool interface and factory for mini-prophet."""
+"""Search backend interface and factory for mini-prophet."""
 
 from __future__ import annotations
 
@@ -12,13 +12,13 @@ from miniprophet.environment.source_board import Source
 
 @dataclass
 class SearchResult:
-    """Return type for SearchTool.search()."""
+    """Return type for SearchBackend.search()."""
 
     sources: list[Source]
     cost: float = 0.0
 
 
-class SearchTool(Protocol):
+class SearchBackend(Protocol):
     """Protocol that any search backend must satisfy."""
 
     def search(self, query: str, limit: int = 5, **kwargs) -> SearchResult: ...
@@ -27,14 +27,14 @@ class SearchTool(Protocol):
 
 
 _SEARCH_CLASS_MAPPING: dict[str, str] = {
-    "brave": "miniprophet.search.brave.BraveSearchTool",
-    "perplexity": "miniprophet.search.perplexity.PerplexitySearchTool",
-    "exa": "miniprophet.search.exa.ExaSearchTool",
+    "brave": "miniprophet.tools.search.brave.BraveSearchBackend",
+    "perplexity": "miniprophet.tools.search.perplexity.PerplexitySearchBackend",
+    "exa": "miniprophet.tools.search.exa.ExaSearchBackend",
 }
 
 
-def get_search_tool(search_cfg: dict) -> SearchTool:
-    """Instantiate a search tool from a config dict.
+def get_search_backend(search_cfg: dict) -> SearchBackend:
+    """Instantiate a search backend from a config dict.
 
     The 'search_class' key selects the implementation (default: "perplexity").
     Remaining keys are forwarded as keyword arguments to the constructor.
@@ -60,4 +60,4 @@ def get_search_tool(search_cfg: dict) -> SearchTool:
     return cls(**accepted)
 
 
-__all__ = ["SearchTool", "SearchResult", "get_search_tool", "Source"]
+__all__ = ["SearchBackend", "SearchResult", "get_search_backend", "Source"]
