@@ -58,6 +58,9 @@ def main(
     search_class: str | None = typer.Option(
         None, "--search-class", help="Override search class (e.g. perplexity, exa, brave)."
     ),
+    disable_history: bool = typer.Option(
+        False, "--disable-history", help="Skip writing to forecast history."
+    ),
 ) -> None:
     """Run the forecasting agent on a question with specified outcomes."""
     from miniprophet.agent.cli_agent import CliForecastAgent
@@ -161,6 +164,19 @@ def main(
             title=resolved_title, outcomes=outcome_list, ground_truth=ground_truth, **runtime_kwargs
         )
 
+        if result.get("submission") and not disable_history:
+            from miniprophet.cli.components.forecast_history import append_history
+
+            model_cfg = config.get("model", {})
+            append_history(
+                title=resolved_title,
+                outcomes=outcome_list,
+                ground_truth=ground_truth,
+                submission=result["submission"],
+                model_name=model_cfg.get("model_name", ""),
+                model_class=model_cfg.get("model_class", ""),
+            )
+
         if not result.get("submission"):
             console.print(
                 f"\n[bold yellow]Agent exited without submitting.[/bold yellow] "
@@ -199,8 +215,9 @@ def _interactive_flow(
         "  [cyan]1[/cyan] Manual input\n"
         "  [cyan]2[/cyan] Kalshi ticker (auto-detect event/market)\n"
         "  [cyan]3[/cyan] Polymarket identifier (auto-detect event/market)\n"
+        "  [cyan]4[/cyan] From historical forecasts\n"
         "  Choose",
-        choices=["1", "2", "3"],
+        choices=["1", "2", "3", "4"],
         default="1",
     )
 
@@ -212,12 +229,23 @@ def _interactive_flow(
         prefill_title, prefill_outcomes_list, prefill_ground_truth = _fetch_kalshi()
     elif choice == "3":
         prefill_title, prefill_outcomes_list, prefill_ground_truth = _fetch_polymarket()
+    elif choice == "4":
+        result = _browse_history()
+        if result is not None:
+            prefill_title, prefill_outcomes_list, prefill_ground_truth = result
 
     return prompt_forecast_params(
         prefill_title=prefill_title,
         prefill_outcomes=prefill_outcomes_list,
         prefill_ground_truth=prefill_ground_truth,
     )
+
+
+def _browse_history() -> tuple[str, list[str], dict[str, int] | None] | None:
+    """Browse forecast history and return selected entry data or None."""
+    from miniprophet.cli.components.forecast_history import browse_history_interactive
+
+    return browse_history_interactive()
 
 
 def _fetch_kalshi() -> tuple[str, list[str], dict[str, int] | None]:

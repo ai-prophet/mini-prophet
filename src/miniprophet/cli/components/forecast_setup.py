@@ -43,7 +43,7 @@ def _edit_outcomes(outcomes: list[str]) -> list[str]:
             console.print("  [dim](Empty: awaiting input...)[/dim]")
 
         console.print(
-            "\n  [dim]Type an outcome to add, a number to delete, or press Enter to confirm.[/dim]"
+            "\n  [dim]Type an outcome to add (comma-separated for multiple), a number to delete, or press Enter to confirm.[/dim]"
         )
         inp = Prompt.ask("  [bold]>>>[/bold]", default="").strip()
 
@@ -61,8 +61,10 @@ def _edit_outcomes(outcomes: list[str]) -> list[str]:
             else:
                 console.print("  [red]Invalid number.[/red]")
         else:
-            outcomes.append(inp)
-            console.print(f"  [green]Added: {inp}[/green]")
+            new_items = [item.strip() for item in inp.split(",") if item.strip()]
+            for item in new_items:
+                outcomes.append(item)
+                console.print(f"  [green]Added: {item}[/green]")
 
     return outcomes
 
