@@ -57,7 +57,7 @@ class EvalProgressManager:
         )
         self._task_bar = Progress(
             SpinnerColumn(spinner_name="dots2"),
-            TextColumn("{task.fields[task_id]}"),
+            TextColumn("{task.fields[run_id]}"),
             TextColumn("{task.fields[status]}"),
             TimeElapsedColumn(),
         )
@@ -100,7 +100,7 @@ class EvalProgressManager:
                 description=f"Run {task_id}",
                 status="initializing",
                 total=None,
-                task_id=_shorten(task_id, 25, left=True),
+                run_id=_shorten(task_id, 25, left=True),
             )
 
     def update_run_status(self, task_id: str, message: str, cost_delta: float = 0.0) -> None:
@@ -109,7 +109,7 @@ class EvalProgressManager:
                 self._task_bar.update(
                     self._spinner_tasks[task_id],
                     status=_shorten(message, 30),
-                    task_id=_shorten(task_id, 25, left=True),
+                    run_id=_shorten(task_id, 25, left=True),
                 )
         if cost_delta:
             self._update_cost(cost_delta)
