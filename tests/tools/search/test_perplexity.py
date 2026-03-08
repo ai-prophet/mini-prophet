@@ -29,11 +29,15 @@ class _FakeClient:
 
 
 def _make_result(url: str, title: str, snippet: str, date: str | None, last_updated: str | None):
-    return types.SimpleNamespace(url=url, title=title, snippet=snippet, date=date, last_updated=last_updated)
+    return types.SimpleNamespace(
+        url=url, title=title, snippet=snippet, date=date, last_updated=last_updated
+    )
 
 
 @pytest.fixture
-def backend_and_client(monkeypatch: pytest.MonkeyPatch) -> tuple[PerplexitySearchBackend, _FakeClient]:
+def backend_and_client(
+    monkeypatch: pytest.MonkeyPatch,
+) -> tuple[PerplexitySearchBackend, _FakeClient]:
     monkeypatch.setenv("PERPLEXITY_API_KEY", "test-key")
     fake_client = _FakeClient()
     monkeypatch.setattr(
@@ -76,9 +80,7 @@ class TestPerplexitySearch:
         backend, client = backend_and_client
         client._response = types.SimpleNamespace(results=[])
 
-        backend.search(
-            "test", search_date_after="01/01/2026", search_date_before="03/01/2026"
-        )
+        backend.search("test", search_date_after="01/01/2026", search_date_before="03/01/2026")
         assert client.last_payload["search_after_date_filter"] == "01/01/2026"
         assert client.last_payload["search_before_date_filter"] == "03/01/2026"
 

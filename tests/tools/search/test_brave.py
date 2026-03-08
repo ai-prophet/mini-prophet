@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import types
-
 import pytest
 import requests
 
@@ -125,7 +123,7 @@ class TestBraveSearch:
         monkeypatch.setattr(
             backend,
             "_get_links",
-            lambda q, l, **kw: [
+            lambda q, limit, **kw: [
                 {"url": "https://a.com", "title": "A", "snippet": "s", "date": None},
                 {"url": "https://b.com", "title": "B", "snippet": "s2", "date": "1d"},
             ],
@@ -142,7 +140,7 @@ class TestBraveSearch:
     def test_search_strips_date_filter_kwargs(
         self, backend: BraveSearchBackend, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        monkeypatch.setattr(backend, "_get_links", lambda q, l, **kw: [])
+        monkeypatch.setattr(backend, "_get_links", lambda q, limit, **kw: [])
         monkeypatch.setattr(backend, "_fetch_article_text", lambda url: None)
 
         result = backend.search(

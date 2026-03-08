@@ -8,7 +8,6 @@ import pytest
 from miniprophet.exceptions import SearchAuthError, SearchNetworkError, SearchRateLimitError
 from miniprophet.tools.search.exa import CONTENT_NOT_AVAILABLE, ExaSearchBackend
 
-
 # --- Date utility tests (existing) ---
 
 
@@ -180,9 +179,7 @@ class TestExaSnippetExtraction:
         snippet = backend._extract_snippet(item)
         assert snippet == CONTENT_NOT_AVAILABLE
 
-    def test_highlights_mode_prefers_highlights(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_highlights_mode_prefers_highlights(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("EXA_API_KEY", "key")
         fake_client = _FakeExaClient()
         monkeypatch.setattr("miniprophet.tools.search.exa.Exa", lambda api_key: fake_client)
@@ -218,9 +215,7 @@ class TestExaHelpers:
         payload = backend._build_contents_payload()
         assert "text" in payload
 
-    def test_build_contents_payload_highlights(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_build_contents_payload_highlights(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("EXA_API_KEY", "key")
         monkeypatch.setattr("miniprophet.tools.search.exa.Exa", lambda api_key: None)
         backend = ExaSearchBackend(content_mode="highlights")
