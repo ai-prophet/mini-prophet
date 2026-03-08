@@ -26,6 +26,7 @@ dev = [
     "ruff",
     "pre-commit",
     "pytest",
+    "pytest-cov",
     "perplexityai",
     "exa-py",
 ]
@@ -60,4 +61,22 @@ quote-style = "double"
 testpaths = ["tests"]
 markers = [
     "live_api: tests that perform real external API calls (disabled unless explicitly selected).",
+]
+
+[tool.coverage.run]
+source = ["miniprophet"]
+omit = [
+    "src/miniprophet/__main__.py",
+    "src/miniprophet/cli/*",
+    "src/miniprophet/run/app.py",
+    "src/miniprophet/run/cli.py",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_empty = true
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.",
+    "if TYPE_CHECKING:",
 ]
