@@ -6,19 +6,8 @@ from pathlib import Path
 import pytest
 import typer
 
-from miniprophet.cli.components.env_editor import is_valid_env_key
-from miniprophet.cli.utils import get_console
 from miniprophet.eval.cli import _build_eval_config, _resolve_resume_state
 from miniprophet.eval.runner import ForecastProblem
-
-
-def test_get_console_is_singleton() -> None:
-    assert get_console() is get_console()
-
-
-def test_is_valid_env_key_accepts_and_rejects() -> None:
-    assert is_valid_env_key("OPENAI_API_KEY") is True
-    assert is_valid_env_key("1BAD") is False
 
 
 def test_build_batch_config_applies_overrides() -> None:

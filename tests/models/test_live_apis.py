@@ -2,7 +2,7 @@
 
 ################################################################################
 #                                                                              #
-#                         ⚠️  CRITICAL WARNING ⚠️                              #
+#                         CRITICAL WARNING                                     #
 #                                                                              #
 #   THIS TEST FILE SHOULD NEVER BE RUN BY AN AI AGENT.                         #
 #   IT REQUIRES EXPLICIT HUMAN REQUEST AND SUPERVISION.                        #
