@@ -74,5 +74,10 @@ search:
     search_type: "auto"
     category: null
 
+context_manager:
+  context_manager_class: "sliding_window"
+  sliding_window:
+    window_size: 10
+
 eval:
   timeout: 180  # 3 minutes

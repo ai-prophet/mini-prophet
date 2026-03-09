@@ -6,9 +6,6 @@ import logging
 import threading
 from typing import Any
 
-from miniprophet import ContextManager, Environment, Model
-from miniprophet.agent.default import AgentConfig, DefaultForecastAgent
-from miniprophet.eval.progress import EvalProgressManager
 from miniprophet.exceptions import BatchRunTimeoutError
 
 logger = logging.getLogger("miniprophet.agent.eval")
@@ -42,63 +39,6 @@ class RateLimitCoordinator:
                 timer.start()
 
 
-class BatchForecastAgent(DefaultForecastAgent):
-    """Default agent variant with eval-safe pause/cancel and progress hooks."""
-
-    def __init__(
-        self,
-        model: Model,
-        env: Environment,
-        *,
-        context_manager: ContextManager | None = None,
-        config_class: type = AgentConfig,
-        task_id: str = "",
-        coordinator: RateLimitCoordinator | None = None,
-        progress_manager: EvalProgressManager | None = None,
-        cancel_event: threading.Event | None = None,
-        **kwargs,
-    ) -> None:
-        super().__init__(
-            model=model,
-            env=env,
-            context_manager=context_manager,
-            config_class=config_class,
-            **kwargs,
-        )
-        self.task_id = task_id
-        self._coordinator = coordinator
-        self._progress = progress_manager
-        self._cancel_event = cancel_event
-        self._prev_cost = 0.0
-
-    def _check_cancelled(self) -> None:
-        if self._cancel_event is not None and self._cancel_event.is_set():
-            raise BatchRunTimeoutError("Eval run timed out and was cancelled.")
-
-    def step(self) -> list[dict]:
-        self._check_cancelled()
-
-        if self._coordinator is not None:
-            resumed = self._coordinator.wait_if_paused(cancel_event=self._cancel_event)
-            if not resumed:
-                raise BatchRunTimeoutError("Eval run timed out and was cancelled.")
-
-        res = super().step()
-
-        self._check_cancelled()
-
-        cost_delta = self.total_cost - self._prev_cost
-        self._prev_cost = self.total_cost
-
-        if self._progress is not None:
-            self._progress.update_run_status(
-                self.task_id,
-                f"Step {self.n_calls + 1} (${self.total_cost:.2f}/{self.config.cost_limit:.2f})",
-                cost_delta=cost_delta,
-            )
-        return res
-
-
 class EvalBatchAgentWrapper:
     """Wrap arbitrary agents so they can run in eval worker orchestration."""
 
@@ -107,9 +47,9 @@ class EvalBatchAgentWrapper:
         *,
         agent: Any,
         task_id: str,
-        coordinator: RateLimitCoordinator | None,
-        progress_manager: EvalProgressManager | None,
-        cancel_event: threading.Event | None,
+        coordinator: RateLimitCoordinator | None = None,
+        progress_manager: Any | None = None,
+        cancel_event: threading.Event | None = None,
     ) -> None:
         self._agent = agent
         self.task_id = task_id
@@ -161,9 +101,14 @@ class EvalBatchAgentWrapper:
                 cost_delta = self.total_cost - self._prev_cost
                 self._prev_cost = self.total_cost
                 step_idx = int(getattr(self._agent, "n_calls", 0) or 0) + 1
+                cost_limit = getattr(getattr(self._agent, "config", None), "cost_limit", None)
+                if cost_limit is not None:
+                    msg = f"Step {step_idx} (${self.total_cost:.2f}/${cost_limit:.2f})"
+                else:
+                    msg = f"Step {step_idx} (${self.total_cost:.2f})"
                 self._progress.update_run_status(
                     self.task_id,
-                    f"Step {step_idx} (${self.total_cost:.2f})",
+                    msg,
                     cost_delta=cost_delta,
                 )
             return res

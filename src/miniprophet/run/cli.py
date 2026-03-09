@@ -64,7 +64,7 @@ def main(
 ) -> None:
     """Run the forecasting agent on a question with specified outcomes."""
     from miniprophet.agent.cli_agent import CliForecastAgent
-    from miniprophet.agent.context import SlidingWindowContextManager
+    from miniprophet.agent.context import get_context_manager
     from miniprophet.config import get_config_from_spec
     from miniprophet.environment.forecast_env import ForecastEnvironment, create_default_tools
     from miniprophet.environment.source_board import SourceBoard
@@ -146,10 +146,8 @@ def main(
         )
         env = ForecastEnvironment(tools, board=board)
 
-        context_window = config.get("agent", {}).get("context_window", 6)
-        ctx_mgr = (
-            SlidingWindowContextManager(window_size=context_window) if context_window > 0 else None
-        )
+        cm_cfg = config.get("context_manager", {})
+        ctx_mgr = get_context_manager(cm_cfg)
         agent = CliForecastAgent(
             model=model, env=env, context_manager=ctx_mgr, **config.get("agent", {})
         )

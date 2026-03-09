@@ -75,6 +75,22 @@ class ContextManager(Protocol):
     def display(self) -> None: ...
 
 
+def __getattr__(name: str) -> Any:
+    """Lazy imports for public batch API to avoid circular imports."""
+    _lazy = {
+        "batch_forecast": "miniprophet.eval.batch",
+        "ForecastProblem": "miniprophet.eval.types",
+        "ForecastResult": "miniprophet.eval.types",
+        "BatchProgressCallback": "miniprophet.eval.types",
+    }
+    if name in _lazy:
+        import importlib
+
+        module = importlib.import_module(_lazy[name])
+        return getattr(module, name)
+    raise AttributeError(f"module 'miniprophet' has no attribute {name!r}")
+
+
 __all__ = [
     "Model",
     "Tool",
@@ -82,4 +98,8 @@ __all__ = [
     "ContextManager",
     "package_dir",
     "__version__",
+    "batch_forecast",
+    "ForecastProblem",
+    "ForecastResult",
+    "BatchProgressCallback",
 ]

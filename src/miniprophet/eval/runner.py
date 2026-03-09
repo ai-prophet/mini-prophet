@@ -1,4 +1,4 @@
-"""Core eval orchestration for running multiple forecasting problems."""
+"""CLI eval orchestration — wraps the public batch API with Rich display and disk I/O."""
 
 from __future__ import annotations
 
@@ -12,19 +12,21 @@ from typing import Any
 
 from miniprophet.eval.agent_factory import EvalAgentFactory
 from miniprophet.eval.agent_runtime import RateLimitCoordinator
+from miniprophet.eval.batch import (
+    MAX_RETRIES,
+    _is_auth_error,
+    _is_rate_limit_error,
+    _run_agent_with_timeout,
+)
 from miniprophet.eval.progress import EvalProgressManager
 from miniprophet.eval.types import ForecastProblem
 from miniprophet.exceptions import (
     BatchFatalError,
     BatchRunTimeoutError,
     SearchAuthError,
-    SearchRateLimitError,
 )
 
 logger = logging.getLogger("miniprophet.eval")
-
-MAX_RETRIES = 3
-RETRYABLE_EXCEPTIONS = (SearchRateLimitError,)
 
 
 @dataclass
@@ -134,34 +136,6 @@ def load_existing_summary(path: Path) -> tuple[dict[str, RunResult], float]:
     return results, total_cost
 
 
-def _is_rate_limit_error(exc: Exception) -> bool:
-    if isinstance(exc, RETRYABLE_EXCEPTIONS):
-        return True
-    exc_str = str(exc).lower()
-    return "429" in exc_str or "rate limit" in exc_str
-
-
-def _is_auth_error(exc: Exception) -> bool:
-    name = type(exc).__name__.lower()
-    msg = str(exc).lower()
-
-    if "auth" in name:
-        return True
-    if "permissiondenied" in name:
-        return True
-
-    auth_tokens = (
-        "authentication",
-        "unauthorized",
-        "permission denied",
-        "invalid api key",
-        "api key",
-        "http 401",
-        "status code 401",
-    )
-    return any(token in msg for token in auth_tokens)
-
-
 def _write_summary(args: EvalRunArgs, state: EvalRunState) -> None:
     summary = {
         "eval_config": {k: v for k, v in args.config.items() if k != "agent"},
@@ -178,46 +152,13 @@ def _write_summary(args: EvalRunArgs, state: EvalRunState) -> None:
         state.summary_path.write_text(json.dumps(summary, indent=2))
 
 
-def _run_agent_with_timeout(
-    *,
-    agent: Any,
-    timeout_seconds: float,
-    cancel_event: threading.Event,
-    task_id: str,
-    title: str,
-    outcomes: list[str],
-    ground_truth: dict[str, int] | None,
-    runtime_kwargs: dict[str, Any],
-) -> Any:
-    timer = None
-    if timeout_seconds > 0:
-        timer = threading.Timer(timeout_seconds, cancel_event.set)
-        timer.daemon = True
-        timer.start()
-    try:
-        result = agent.run(
-            title=title,
-            outcomes=outcomes,
-            ground_truth=ground_truth,
-            **runtime_kwargs,
-        )
-    except BatchRunTimeoutError:
-        raise
-    finally:
-        if timer is not None:
-            timer.cancel()
-    if cancel_event.is_set():
-        raise BatchRunTimeoutError(f"Eval run timed out after {timeout_seconds:.1f}s")
-    return result
-
-
 def process_problem(
     problem: ForecastProblem,
     args: EvalRunArgs,
     state: EvalRunState,
 ) -> bool:
     """Process a single forecasting problem. Returns True if complete/permanent failure."""
-    from miniprophet.agent.context import SlidingWindowContextManager
+    from miniprophet.agent.context import get_context_manager
     from miniprophet.environment.forecast_env import ForecastEnvironment, create_default_tools
     from miniprophet.environment.source_board import SourceBoard
 
@@ -253,10 +194,8 @@ def process_problem(
         )
         env = ForecastEnvironment(tools, board=board)
 
-        context_window = int(agent_cfg.get("context_window", 6) or 0)
-        ctx_mgr = (
-            SlidingWindowContextManager(window_size=context_window) if context_window > 0 else None
-        )
+        cm_cfg = args.config.get("context_manager", {})
+        ctx_mgr = get_context_manager(cm_cfg)
 
         agent_kwargs = dict(args.agent_kwargs)
         if not args.agent_import_path:
@@ -284,7 +223,6 @@ def process_problem(
             agent=agent,
             timeout_seconds=args.timeout_seconds,
             cancel_event=cancel_event,
-            task_id=task_id,
             title=problem.title,
             outcomes=problem.outcomes,
             ground_truth=problem.ground_truth,
