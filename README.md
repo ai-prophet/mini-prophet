@@ -5,7 +5,7 @@
 # mini-prophet
 
 [![CI](https://github.com/ai-prophet/mini-prophet/actions/workflows/ci.yml/badge.svg)](https://github.com/ai-prophet/mini-prophet/actions/workflows/ci.yml)
-[![Coverage](https://github.com/ai-prophet/mini-prophet/actions/workflows/coverage.yml/badge.svg)](https://github.com/ai-prophet/mini-prophet/actions/workflows/coverage.yml)
+[![Coverage](https://codecov.io/gh/ai-prophet/mini-prophet/branch/main/graph/badge.svg)](https://codecov.io/gh/ai-prophet/mini-prophet)
 
 A minimal LLM forecasting agent scaffolding. Inspired by [mini-swe-agent](https://github.com/SWE-agent/mini-swe-agent).
 

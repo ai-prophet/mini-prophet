@@ -1,6 +1,36 @@
 # Changelog
 
 
+## v0.1.8
+
+### New: Public `batch_forecast()` API
+
+- Added `batch_forecast()` as the public, headless API for running multiple forecasts programmatically — no Rich display or disk I/O.
+- New `ForecastResult` and `BatchProgressCallback` types for structured results and progress tracking.
+- Importable from top level: `from miniprophet import batch_forecast, ForecastProblem, ForecastResult`.
+- Supports passing an agent class directly via `agent_class=` in addition to `agent_import_path`.
+
+### Improved: Unified agent wrapper
+
+- Removed `BatchForecastAgent` (inheritance-based); all agents now go through `EvalBatchAgentWrapper` (composition over inheritance).
+- Simplified `EvalAgentFactory.create()` to a single code path for built-in and custom agents.
+
+### New: Configurable context manager
+
+- Added `get_context_manager()` factory with a registry pattern (mirrors `get_search_backend()`).
+- New top-level `context_manager` config section in `default.yaml` with per-class sub-dicts.
+- Both eval and CLI run paths now use the factory instead of hardcoded `SlidingWindowContextManager`.
+
+### Improved: Eval runner internals
+
+- Simplified eval runner threading: hoisted shared model/search_backend state, switched to Timer-based timeouts, removed dead aliases.
+- Fixed race condition in `RateLimitCoordinator.wait_if_paused`.
+- Deduplicated shared helpers into `eval/batch.py`.
+
+### CI
+
+- Switched coverage workflow from artifact upload to Codecov integration.
+
 ## v0.1.7
 
 ### New: Polymarket integration
