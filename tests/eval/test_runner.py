@@ -7,12 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from miniprophet.eval.runner import (
-    _is_auth_error,
-    _is_rate_limit_error,
-    _run_agent_with_timeout,
-    load_existing_summary,
-)
+from miniprophet.eval.batch import _is_auth_error, _is_rate_limit_error, _run_agent_with_timeout
+from miniprophet.eval.runner import load_existing_summary
 from miniprophet.eval.types import ForecastProblem, to_mm_dd_yyyy
 from miniprophet.exceptions import BatchRunTimeoutError, SearchRateLimitError
 
@@ -104,7 +100,6 @@ def test_run_agent_with_timeout_success() -> None:
         agent=_SleepAgent(),
         timeout_seconds=0.2,
         cancel_event=threading.Event(),
-        task_id="r1",
         title="T",
         outcomes=["A", "B"],
         ground_truth=None,
@@ -120,7 +115,6 @@ def test_run_agent_with_timeout_sets_cancel_event_on_timeout() -> None:
             agent=_SleepAgent(sleep_s=2.0, cancel_event=cancel),
             timeout_seconds=0.02,
             cancel_event=cancel,
-            task_id="r1",
             title="T",
             outcomes=["A", "B"],
             ground_truth=None,

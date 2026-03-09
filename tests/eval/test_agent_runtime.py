@@ -5,7 +5,8 @@ import threading
 import pytest
 from conftest import DummyEnvironment, DummyModel
 
-from miniprophet.eval.agent_runtime import BatchForecastAgent, RateLimitCoordinator
+from miniprophet.agent.default import DefaultForecastAgent
+from miniprophet.eval.agent_runtime import EvalBatchAgentWrapper, RateLimitCoordinator
 from miniprophet.exceptions import BatchRunTimeoutError
 
 
@@ -17,46 +18,58 @@ class _Progress:
         self.calls.append((task_id, message, cost_delta))
 
 
-def test_batch_forecast_agent_step_updates_progress(monkeypatch: pytest.MonkeyPatch) -> None:
-    def _fake_super_step(self):
+def test_wrapper_around_default_agent_step_updates_progress(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def _fake_step(self):
         self.model_cost = 1.5
         return [{"role": "tool", "content": "ok"}]
 
-    monkeypatch.setattr(
-        "miniprophet.eval.agent_runtime.DefaultForecastAgent.step", _fake_super_step
-    )
+    monkeypatch.setattr("miniprophet.agent.default.DefaultForecastAgent.step", _fake_step)
 
     progress = _Progress()
-    agent = BatchForecastAgent(
+    raw_agent = DefaultForecastAgent(
         model=DummyModel(),
         env=DummyEnvironment(),
-        task_id="run-x",
-        progress_manager=progress,
         system_template="sys",
         instance_template="inst",
     )
+    wrapper = EvalBatchAgentWrapper(
+        agent=raw_agent,
+        task_id="run-x",
+        progress_manager=progress,
+    )
 
-    out = agent.step()
+    # Patch step via the wrapper's run-time mechanism
+    wrapper._patch_step()
+    out = raw_agent.step()
 
     assert out[0]["content"] == "ok"
     assert progress.calls[0][0] == "run-x"
     assert progress.calls[0][2] == pytest.approx(1.5)
+    # Should include cost_limit in message since DefaultForecastAgent has config.cost_limit
+    assert "/" in progress.calls[0][1]
 
 
-def test_batch_forecast_agent_step_respects_cancel_event() -> None:
+def test_wrapper_step_respects_cancel_event() -> None:
     cancel = threading.Event()
     cancel.set()
 
-    agent = BatchForecastAgent(
+    raw_agent = DefaultForecastAgent(
         model=DummyModel(),
         env=DummyEnvironment(),
-        cancel_event=cancel,
         system_template="sys",
         instance_template="inst",
     )
+    wrapper = EvalBatchAgentWrapper(
+        agent=raw_agent,
+        task_id="run-x",
+        cancel_event=cancel,
+    )
+    wrapper._patch_step()
 
     with pytest.raises(BatchRunTimeoutError, match="timed out"):
-        agent.step()
+        raw_agent.step()
 
 
 def test_rate_limit_coordinator_wait_cancelled() -> None:

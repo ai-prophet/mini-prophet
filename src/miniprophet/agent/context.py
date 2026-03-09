@@ -2,9 +2,51 @@
 
 from __future__ import annotations
 
+import importlib
+import inspect
 import logging
 
+from miniprophet import ContextManager
+
 logger = logging.getLogger("miniprophet.agent.context")
+
+_CONTEXT_MANAGER_MAPPING: dict[str, str] = {
+    "sliding_window": "miniprophet.agent.context.SlidingWindowContextManager",
+}
+
+
+def get_context_manager(config: dict) -> ContextManager | None:
+    """Instantiate a context manager from a config dict.
+
+    The 'context_manager_class' key selects the implementation (default: "sliding_window").
+    Sub-dict keyed by the class name provides constructor kwargs.
+    A value of "none" or empty string disables context management.
+    """
+    cm_class_key = config.get("context_manager_class", "sliding_window")
+    if not cm_class_key or cm_class_key == "none":
+        return None
+
+    cm_kwargs = dict(config.get(cm_class_key, {}))
+
+    full_path = _CONTEXT_MANAGER_MAPPING.get(cm_class_key, cm_class_key)
+    try:
+        module_name, class_name = full_path.rsplit(".", 1)
+        module = importlib.import_module(module_name)
+        cls = getattr(module, class_name)
+    except (ValueError, ImportError, AttributeError) as exc:
+        raise ValueError(
+            f"Unknown context manager class: {cm_class_key} (resolved to {full_path}, "
+            f"available: {list(_CONTEXT_MANAGER_MAPPING)})"
+        ) from exc
+
+    sig = inspect.signature(cls.__init__)
+    if any(p.kind == p.VAR_KEYWORD for p in sig.parameters.values()):
+        accepted = cm_kwargs
+    else:
+        valid_keys = set(sig.parameters.keys()) - {"self"}
+        accepted = {k: v for k, v in cm_kwargs.items() if k in valid_keys}
+
+    return cls(**accepted)
 
 
 class SlidingWindowContextManager:
