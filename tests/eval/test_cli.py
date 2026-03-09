@@ -7,7 +7,7 @@ import pytest
 import typer
 
 from miniprophet.eval.cli import _build_eval_config, _resolve_resume_state
-from miniprophet.eval.runner import ForecastProblem
+from miniprophet.eval.types import ForecastProblem
 
 
 def test_build_batch_config_applies_overrides() -> None:

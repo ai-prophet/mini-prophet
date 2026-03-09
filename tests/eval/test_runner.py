@@ -8,13 +8,12 @@ from pathlib import Path
 import pytest
 
 from miniprophet.eval.runner import (
-    ForecastProblem,
     _is_auth_error,
     _is_rate_limit_error,
     _run_agent_with_timeout,
     load_existing_summary,
-    to_mm_dd_yyyy,
 )
+from miniprophet.eval.types import ForecastProblem, to_mm_dd_yyyy
 from miniprophet.exceptions import BatchRunTimeoutError, SearchRateLimitError
 
 
@@ -82,12 +81,21 @@ def test_is_auth_error(exc: Exception, expected: bool) -> None:
 
 
 class _SleepAgent:
-    def __init__(self, sleep_s: float = 0.0) -> None:
+    def __init__(self, sleep_s: float = 0.0, cancel_event: threading.Event | None = None) -> None:
         self.sleep_s = sleep_s
+        self._cancel_event = cancel_event
 
     def run(self, **kwargs):
         if self.sleep_s:
-            time.sleep(self.sleep_s)
+            if self._cancel_event is not None:
+                # Poll cancel_event in small increments to respond to timeout promptly
+                deadline = time.monotonic() + self.sleep_s
+                while time.monotonic() < deadline:
+                    if self._cancel_event.is_set():
+                        raise BatchRunTimeoutError("Eval run timed out and was cancelled.")
+                    time.sleep(0.005)
+            else:
+                time.sleep(self.sleep_s)
         return {"exit_status": "submitted"}
 
 
@@ -109,8 +117,8 @@ def test_run_agent_with_timeout_sets_cancel_event_on_timeout() -> None:
     cancel = threading.Event()
     with pytest.raises(BatchRunTimeoutError, match="timed out"):
         _run_agent_with_timeout(
-            agent=_SleepAgent(sleep_s=0.1),
-            timeout_seconds=0.01,
+            agent=_SleepAgent(sleep_s=2.0, cancel_event=cancel),
+            timeout_seconds=0.02,
             cancel_event=cancel,
             task_id="r1",
             title="T",

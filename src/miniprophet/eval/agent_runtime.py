@@ -26,7 +26,7 @@ class RateLimitCoordinator:
     def wait_if_paused(self, cancel_event: threading.Event | None = None) -> bool:
         if cancel_event is not None and cancel_event.is_set():
             return False
-        while not self._resume.wait(timeout=0.2):
+        while not self._resume.wait(timeout=1.0):
             if cancel_event is not None and cancel_event.is_set():
                 return False
         return True
@@ -71,22 +71,21 @@ class BatchForecastAgent(DefaultForecastAgent):
         self._cancel_event = cancel_event
         self._prev_cost = 0.0
 
-    def step(self) -> list[dict]:
+    def _check_cancelled(self) -> None:
         if self._cancel_event is not None and self._cancel_event.is_set():
             raise BatchRunTimeoutError("Eval run timed out and was cancelled.")
+
+    def step(self) -> list[dict]:
+        self._check_cancelled()
 
         if self._coordinator is not None:
             resumed = self._coordinator.wait_if_paused(cancel_event=self._cancel_event)
             if not resumed:
                 raise BatchRunTimeoutError("Eval run timed out and was cancelled.")
 
-        if self._cancel_event is not None and self._cancel_event.is_set():
-            raise BatchRunTimeoutError("Eval run timed out and was cancelled.")
-
         res = super().step()
 
-        if self._cancel_event is not None and self._cancel_event.is_set():
-            raise BatchRunTimeoutError("Eval run timed out and was cancelled.")
+        self._check_cancelled()
 
         cost_delta = self.total_cost - self._prev_cost
         self._prev_cost = self.total_cost
@@ -137,9 +136,12 @@ class EvalBatchAgentWrapper:
                 pass
         return self.model_cost + self.search_cost
 
-    def _pre_step_guard(self) -> None:
+    def _check_cancelled(self) -> None:
         if self._cancel_event is not None and self._cancel_event.is_set():
             raise BatchRunTimeoutError("Eval run timed out and was cancelled.")
+
+    def _pre_step_guard(self) -> None:
+        self._check_cancelled()
 
         if self._coordinator is not None:
             resumed = self._coordinator.wait_if_paused(cancel_event=self._cancel_event)

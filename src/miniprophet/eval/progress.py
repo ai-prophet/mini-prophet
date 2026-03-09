@@ -128,7 +128,3 @@ class EvalProgressManager:
 
     def on_uncaught_exception(self, task_id: str, exc: Exception) -> None:
         self.on_run_end(task_id, f"Uncaught {type(exc).__name__}")
-
-
-# Backward-compatible internal alias.
-BatchProgressManager = EvalProgressManager
