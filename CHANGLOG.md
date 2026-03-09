@@ -1,6 +1,34 @@
 # Changelog
 
 
+## v0.1.7
+
+### New: Polymarket integration
+
+- Added `PolymarketService` for fetching markets and events from Polymarket, supporting ticker-based and URL-based lookups.
+- `prophet run` now supports Polymarket event/market tickers and URLs as input alongside Kalshi.
+
+### Improved: Search backend refactor
+
+- Refactored search backends (`brave`, `exa`, `perplexity`) into `tools/search/` subpackage, separating backend implementations from the tool interface.
+
+### Improved: Eval and dataset handling
+
+- `prophet eval` progress tracking fixed: renamed internal `task_id` field to `run_id` to prevent crashes.
+- Relaxed dataset validation requirements.
+- Improved `prophet datasets` CLI display.
+- Removed legacy dataset keys.
+
+### New: Run history
+
+- Added save/load forecast history to `prophet run`, allowing review of past runs.
+
+### Testing and CI
+
+- Added GitHub Actions coverage workflow.
+- Reorganized test structure to mirror `src/miniprophet/` layout.
+- Added tests for search backends, services, models, eval components, and tools.
+
 ## v0.1.6
 
 ### Major: `prophet eval` replaces `prophet batch`
