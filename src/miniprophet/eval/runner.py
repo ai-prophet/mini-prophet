@@ -12,10 +12,8 @@ from typing import Any
 
 from miniprophet.eval.agent_factory import EvalAgentFactory
 from miniprophet.eval.agent_runtime import RateLimitCoordinator
-from miniprophet.eval.datasets.validate import load_problems as _load_problems
 from miniprophet.eval.progress import EvalProgressManager
 from miniprophet.eval.types import ForecastProblem
-from miniprophet.eval.types import to_mm_dd_yyyy as _to_mm_dd_yyyy
 from miniprophet.exceptions import (
     BatchFatalError,
     BatchRunTimeoutError,
@@ -104,8 +102,9 @@ class EvalRunState:
     summary_path: Path
     results: dict[str, RunResult]
     total_cost_ref: list[float]
-    fatal_lock: threading.Lock
     fatal_event: threading.Event
+    model: Any
+    search_backend: Any
     fatal_error: str | None = None
 
 
@@ -190,47 +189,26 @@ def _run_agent_with_timeout(
     ground_truth: dict[str, int] | None,
     runtime_kwargs: dict[str, Any],
 ) -> Any:
-    if timeout_seconds <= 0:
-        return agent.run(
+    timer = None
+    if timeout_seconds > 0:
+        timer = threading.Timer(timeout_seconds, cancel_event.set)
+        timer.daemon = True
+        timer.start()
+    try:
+        result = agent.run(
             title=title,
             outcomes=outcomes,
             ground_truth=ground_truth,
             **runtime_kwargs,
         )
-
-    done = threading.Event()
-    result_holder: list[Any] = []
-    error_holder: list[Exception] = []
-
-    def _target() -> None:
-        try:
-            result_holder.append(
-                agent.run(
-                    title=title,
-                    outcomes=outcomes,
-                    ground_truth=ground_truth,
-                    **runtime_kwargs,
-                )
-            )
-        except Exception as exc:
-            error_holder.append(exc)
-        finally:
-            done.set()
-
-    thread = threading.Thread(target=_target, name=f"eval-run-{task_id}", daemon=True)
-    thread.start()
-
-    if not done.wait(timeout=timeout_seconds):
-        cancel_event.set()
+    except BatchRunTimeoutError:
+        raise
+    finally:
+        if timer is not None:
+            timer.cancel()
+    if cancel_event.is_set():
         raise BatchRunTimeoutError(f"Eval run timed out after {timeout_seconds:.1f}s")
-
-    if error_holder:
-        raise error_holder[0]
-
-    if not result_holder:
-        raise RuntimeError(f"Run {task_id} finished without a result payload")
-
-    return result_holder[0]
+    return result
 
 
 def process_problem(
@@ -242,8 +220,6 @@ def process_problem(
     from miniprophet.agent.context import SlidingWindowContextManager
     from miniprophet.environment.forecast_env import ForecastEnvironment, create_default_tools
     from miniprophet.environment.source_board import SourceBoard
-    from miniprophet.models import get_model
-    from miniprophet.tools.search import get_search_backend
 
     task_id = problem.task_id
     run_dir = args.output_dir / "runs" / task_id
@@ -263,15 +239,12 @@ def process_problem(
             state.progress.on_run_end(task_id, result.status)
             return True
 
-        model = get_model(config=args.config.get("model", {}))
         search_cfg = args.config.get("search", {})
-        search_backend = get_search_backend(search_cfg=search_cfg)
-
         agent_cfg = args.config.get("agent", {})
         agent_search_limit = int(agent_cfg.get("search_limit", 10) or 10)
         board = SourceBoard()
         tools = create_default_tools(
-            search_tool=search_backend,
+            search_tool=state.search_backend,
             outcomes=problem.outcomes,
             board=board,
             search_limit=agent_search_limit,
@@ -290,7 +263,7 @@ def process_problem(
             agent_kwargs = {**agent_cfg, **agent_kwargs}
 
         agent = EvalAgentFactory.create(
-            model=model,
+            model=state.model,
             env=env,
             context_manager=ctx_mgr,
             agent_name=args.agent_name,
@@ -390,7 +363,12 @@ def run_eval(
 
     from rich.live import Live
 
+    from miniprophet.models import get_model
+    from miniprophet.tools.search import get_search_backend
+
     args.output_dir.mkdir(parents=True, exist_ok=True)
+    model = get_model(config=args.config.get("model", {}))
+    search_backend = get_search_backend(search_cfg=args.config.get("search", {}))
     state = EvalRunState(
         coordinator=RateLimitCoordinator(),
         progress=EvalProgressManager(len(problems)),
@@ -398,8 +376,9 @@ def run_eval(
         summary_path=args.output_dir / "summary.json",
         results=dict(args.initial_results or {}),
         total_cost_ref=[float(args.initial_total_cost)],
-        fatal_lock=threading.Lock(),
         fatal_event=threading.Event(),
+        model=model,
+        search_backend=search_backend,
     )
 
     queue: Queue[ForecastProblem] = Queue()
@@ -438,10 +417,8 @@ def run_eval(
                 if not done and not state.fatal_event.is_set():
                     queue.put(problem)
             except BatchFatalError as exc:
-                with state.fatal_lock:
-                    if not state.fatal_event.is_set():
-                        state.fatal_error = str(exc)
-                        state.fatal_event.set()
+                state.fatal_error = str(exc)
+                state.fatal_event.set()
                 _drain_pending_queue()
                 return
             except Exception as exc:
@@ -476,11 +453,3 @@ def run_eval(
         raise BatchFatalError(state.fatal_error or "Eval terminated due to a fatal error.")
 
     return state.results
-
-
-# Backward internal aliases for migrated test names.
-BatchRunArgs = EvalRunArgs
-BatchRunState = EvalRunState
-run_batch = run_eval
-load_problems = _load_problems
-to_mm_dd_yyyy = _to_mm_dd_yyyy
