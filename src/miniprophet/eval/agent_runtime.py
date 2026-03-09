@@ -24,6 +24,8 @@ class RateLimitCoordinator:
         self._backoff = backoff_seconds
 
     def wait_if_paused(self, cancel_event: threading.Event | None = None) -> bool:
+        if cancel_event is not None and cancel_event.is_set():
+            return False
         while not self._resume.wait(timeout=0.2):
             if cancel_event is not None and cancel_event.is_set():
                 return False
