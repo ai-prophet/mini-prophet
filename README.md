@@ -110,7 +110,7 @@ Run artifacts now include `sources.json` in addition to `info.json` and `traject
 
 ## Contributing
 
-Contributor-facing testing and CI notes live in [CONTRIBUTOR.md](CONTRIBUTOR.md).
+Contributor-facing testing and CI notes live in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Docs
 

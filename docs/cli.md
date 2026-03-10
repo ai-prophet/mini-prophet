@@ -32,6 +32,7 @@ prophet run --title "..." --outcomes "Yes,No"
 | `--step-limit` |  | Max loop steps |
 | `--config` | `-c` | Config file(s) or `key=value` overrides |
 | `--output` |  | Output directory (`info.json`, `trajectory.json`, `sources.json`) |
+| `--disable-history` |  | Skip writing to forecast history |
 
 ## Examples
 
@@ -75,7 +76,7 @@ prophet run -i
 
 ```bash
 # switch search backend
-prophet run -t "..." -o "..." --search_class perplexity
+prophet run -t "..." -o "..." --search-class perplexity
 # this is equivalent to:
 prophet run -t "..." -o "..." -c search.search_class=exa
 
@@ -93,8 +94,9 @@ prophet run -t "..." -o "..." -c search.search_date_after=01/01/2025
 Interactive mode supports:
 
 - manual title/outcomes entry
-- optional Kalshi ticker import
-- rerunning from setup after a completed run
+- Kalshi ticker import (auto-detect event/market)
+- Polymarket identifier import (auto-detect event/market)
+- browsing and rerunning from historical forecasts
 
 ## Exit/output behavior
 
