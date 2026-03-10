@@ -83,7 +83,7 @@ This is how run-level date bounds reach backend-specific search filters.
 
 - `DefaultForecastAgent`: core loop, limits, serialization
 - `CliForecastAgent`: CLI display hooks
-- `BatchForecastAgent`: eval progress + rate-limit coordination
+- `EvalBatchAgentWrapper`: eval progress + rate-limit coordination
 - `ForecastEnvironment`: tool dispatcher
 - `SourceBoard`: invariant evidence state
 - `TrajectoryRecorder`: per-step replayable trace
