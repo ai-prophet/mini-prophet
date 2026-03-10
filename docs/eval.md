@@ -1,9 +1,12 @@
-# Eval Processing
+# Eval CLI
 
-This page covers `prophet eval` for running many forecasting tasks from either:
+`prophet eval` is the CLI for running many forecasting tasks from either a
+local JSONL file or a dataset reference. It wraps the
+[batch forecasting API](batch.md) with dataset resolution, resume support, Rich
+live progress display, and per-run artifact saving.
 
-- a local JSONL file (`-f/--input`)
-- a dataset reference (`-d/--dataset`)
+For the underlying Python API and custom agent contract, see
+[docs/batch.md](batch.md).
 
 ## CLI entrypoint
 
@@ -81,7 +84,7 @@ prophet eval \
 
 ## Input row schema
 
-Each task row is one JSON object. Required field:
+Each task row is one JSON object. Required fields:
 
 - `title` (string)
 - `outcomes` (array of strings, length >= 1)

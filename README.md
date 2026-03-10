@@ -118,7 +118,8 @@ Detailed docs are split by topic:
 
 - [Architecture](docs/architecture.md)
 - [CLI (single run)](docs/cli.md)
-- [Eval processing](docs/eval.md)
+- [Batch forecasting API](docs/batch.md)
+- [Eval CLI](docs/eval.md)
 - [Dataset management](docs/datasets.md)
 - [Extending the framework](docs/extension.md)
 - [Output and trajectory format](docs/output.md)
