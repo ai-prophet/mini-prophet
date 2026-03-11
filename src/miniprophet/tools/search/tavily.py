@@ -27,11 +27,11 @@ TAVILY_SEARCH_PARAMETERS_SCHEMA: dict[str, Any] = {
             "type": "string",
             "description": "The search query to find relevant information.",
         },
-        "time_range": {
+        "start_date": {
             "type": "string",
             "description": (
-                "Optional time filter for recency. "
-                "One of 'day', 'week', 'month', 'year'."
+                "Optional start date filter (YYYY-MM-DD). "
+                "Only return results published on or after this date."
             ),
         },
     },
