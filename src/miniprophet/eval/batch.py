@@ -281,6 +281,7 @@ def batch_forecast(
     agent_import_path: str | None = None,
     agent_class: type | None = None,
     agent_kwargs: dict[str, Any] | None = None,
+    model: Any | None = None,
 ) -> list[ForecastResult]:
     """Run forecasting problems in parallel and return results.
 
@@ -298,17 +299,21 @@ def batch_forecast(
         agent_import_path: Import path for custom agent ("module.path:ClassName").
         agent_class: Agent class directly (alternative to agent_import_path).
         agent_kwargs: Extra kwargs forwarded to the agent constructor.
+        model: Pre-constructed model instance satisfying the Model protocol.
+            When provided, ``get_model()`` is skipped and this model is shared
+            across all workers.  Useful for injecting an external LLM adapter.
 
     Returns:
         List of ForecastResult, one per input problem, in the same order.
     """
-    from miniprophet.models import get_model
     from miniprophet.tools.search import get_search_backend
 
     resolved_config = _load_config(config)
     resolved_kwargs = dict(agent_kwargs or {})
 
-    model = get_model(config=resolved_config.get("model", {}))
+    if model is None:
+        from miniprophet.models import get_model
+        model = get_model(config=resolved_config.get("model", {}))
     search_backend = get_search_backend(search_cfg=resolved_config.get("search", {}))
 
     coordinator = RateLimitCoordinator()
