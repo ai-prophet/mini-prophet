@@ -30,6 +30,7 @@ _SEARCH_CLASS_MAPPING: dict[str, str] = {
     "brave": "miniprophet.tools.search.brave.BraveSearchBackend",
     "perplexity": "miniprophet.tools.search.perplexity.PerplexitySearchBackend",
     "exa": "miniprophet.tools.search.exa.ExaSearchBackend",
+    "tavily": "miniprophet.tools.search.tavily.TavilySearchBackend",
 }
 
 

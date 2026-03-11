@@ -26,7 +26,7 @@ prophet run --title "..." --outcomes "Yes,No"
 | `--interactive` | `-i` | Launch interactive setup flow |
 | `--model` | `-m` | Model override |
 | `--model-class` |  | Model class override (`litellm`, `openrouter`) |
-| `--search-class` |  | Search class override (`perplexity`, `exa`, `brave`) |
+| `--search-class` |  | Search class override (`perplexity`, `exa`, `brave`, `tavily`) |
 | `--cost-limit` | `-l` | Total run cost limit |
 | `--search-limit` |  | Max search tool calls |
 | `--step-limit` |  | Max loop steps |
@@ -83,6 +83,7 @@ prophet run -t "..." -o "..." -c search.search_class=exa
 # tune backend-specific search settings
 prophet run -t "..." -o "..." -c search.perplexity.max_tokens=8000
 prophet run -t "..." -o "..." -c search.exa.content_mode=highlights
+prophet run -t "..." -o "..." -c search.tavily.search_depth=advanced
 
 # inject run-time date bounds
 prophet run -t "..." -o "..." -c search.search_date_before=01/31/2026

@@ -29,12 +29,16 @@ dev = [
     "pytest-cov",
     "perplexityai",
     "exa-py",
+    "tavily-python",
 ]
 perplexity = [
     "perplexityai",
 ]
 exa = [
     "exa-py",
+]
+tavily = [
+    "tavily-python",
 ]
 hf = [
     "datasets",
