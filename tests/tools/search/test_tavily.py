@@ -68,9 +68,7 @@ class TestTavilyInit:
             "miniprophet.tools.search.tavily.TavilyClient",
             lambda api_key: _FakeTavilyClient(),
         )
-        backend = TavilySearchBackend(
-            search_depth="advanced", topic="news", max_characters=5000
-        )
+        backend = TavilySearchBackend(search_depth="advanced", topic="news", max_characters=5000)
         assert backend._search_depth == "advanced"
         assert backend._topic == "news"
         assert backend._max_characters == 5000

@@ -126,7 +126,7 @@ class TavilySearchBackend:
 
             title = item.get("title", "") or url
             content = item.get("content", "")
-            snippet = content[:self._max_characters] if content else ""
+            snippet = content[: self._max_characters] if content else ""
             date = item.get("published_date") or None
 
             sources.append(Source(url=url, title=title, snippet=snippet, date=date))
