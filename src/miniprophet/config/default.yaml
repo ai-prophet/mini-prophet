@@ -39,6 +39,8 @@ agent:
   max_outcomes: 20
   context_window: 10
   show_current_time: false
+  enable_grace_period: false
+  grace_period_extra_turns: 3
 
 model:
   model_class: "litellm"

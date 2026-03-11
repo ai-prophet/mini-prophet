@@ -25,6 +25,14 @@ class ForecastResult(TypedDict, total=False):
     board: list[dict]
 
 
+GRACE_PERIOD_PROMPT = (
+    "You have reached the step limit. You MUST now submit your forecast "
+    "immediately using the `submit` tool. No other actions are allowed. "
+    "Use the evidence you have gathered so far to provide your best "
+    "probabilistic forecast."
+)
+
+
 class AgentConfig(BaseModel):
     system_template: str
     instance_template: str
@@ -35,6 +43,9 @@ class AgentConfig(BaseModel):
     context_window: int = 6
     output_path: Path | None = None
     show_current_time: bool = False
+    enable_grace_period: bool = False
+    grace_period_prompt: str = GRACE_PERIOD_PROMPT
+    grace_period_extra_turns: int = 3
 
 
 class DefaultForecastAgent:
@@ -57,6 +68,8 @@ class DefaultForecastAgent:
         self.search_cost = 0.0
         self.n_searches = 0
         self.n_calls = 0
+        self._in_grace_period = False
+        self._grace_period_turns = 0
         self._trajectory = TrajectoryRecorder()
 
     @property
@@ -195,28 +208,49 @@ class DefaultForecastAgent:
 
         return self.execute_actions(self.query())
 
+    def _submit_only_tools(self) -> list[dict]:
+        """Return tool schemas filtered to only the submit tool."""
+        return [t for t in self.env.get_tool_schemas() if t.get("function", {}).get("name") == "submit"]
+
     def query(self) -> dict:
-        if 0 < self.config.step_limit <= self.n_calls:
-            raise LimitsExceeded(
-                {
-                    "role": "exit",
-                    "content": "Step limit exceeded.",
-                    "extra": {"exit_status": "LimitsExceeded", "submission": ""},
-                }
-            )
-        if 0 < self.config.cost_limit <= self.total_cost:
-            raise LimitsExceeded(
-                {
-                    "role": "exit",
-                    "content": "Cost limit exceeded.",
-                    "extra": {"exit_status": "LimitsExceeded", "submission": ""},
-                }
-            )
+        step_limit_hit = 0 < self.config.step_limit <= self.n_calls
+        cost_limit_hit = 0 < self.config.cost_limit <= self.total_cost
+
+        if step_limit_hit or cost_limit_hit:
+            if self.config.enable_grace_period and not self._in_grace_period:
+                self._in_grace_period = True
+                self._grace_period_turns = 0
+
+            if self._in_grace_period:
+                if self._grace_period_turns >= self.config.grace_period_extra_turns:
+                    raise LimitsExceeded(
+                        {
+                            "role": "exit",
+                            "content": "Grace period exhausted.",
+                            "extra": {"exit_status": "LimitsExceeded", "submission": ""},
+                        }
+                    )
+                self.add_messages(
+                    self.model.format_message(
+                        role="user",
+                        content=self.config.grace_period_prompt,
+                    )
+                )
+                self._grace_period_turns += 1
+            else:
+                limit_type = "Step" if step_limit_hit else "Cost"
+                raise LimitsExceeded(
+                    {
+                        "role": "exit",
+                        "content": f"{limit_type} limit exceeded.",
+                        "extra": {"exit_status": "LimitsExceeded", "submission": ""},
+                    }
+                )
 
         self.n_calls += 1
         # Snapshot the messages the model will actually see (post-truncation, post-board inject)
         input_snapshot = list(self.messages)
-        tools = self.env.get_tool_schemas()
+        tools = self._submit_only_tools() if self._in_grace_period else self.env.get_tool_schemas()
         message = self.model.query(self.messages, tools)
         self.model_cost += message.get("extra", {}).get("cost", 0.0)
         self.add_messages(message)
@@ -228,7 +262,15 @@ class DefaultForecastAgent:
 
     def execute_actions(self, message: dict) -> list[dict]:
         actions = message.get("extra", {}).get("actions", [])
-        outputs = [self.env.execute(action, **self.runtime_kwargs) for action in actions]
+        outputs: list[dict] = []
+        for action in actions:
+            if self._in_grace_period and action.get("name") != "submit":
+                outputs.append({
+                    "output": self.config.grace_period_prompt,
+                    "error": True,
+                })
+            else:
+                outputs.append(self.env.execute(action, **self.runtime_kwargs))
         for action, output in zip(actions, outputs):
             sc = output.get("search_cost", 0.0)
             if sc:
