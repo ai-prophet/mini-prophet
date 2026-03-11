@@ -92,11 +92,14 @@ class SlidingWindowContextManager:
         if len(body) <= self.window_size:
             return preamble + body
 
-        # we make sure that we do not truncate away any tool call (so the tool response is not lost)
-        if body[-self.window_size]["role"] == "tool":
-            effective_window_size = self.window_size + 1
-        else:
-            effective_window_size = self.window_size
+        # Expand the window so we never orphan tool-result messages from
+        # their preceding assistant message (which carries the tool_calls).
+        effective_window_size = self.window_size
+        while (
+            effective_window_size < len(body)
+            and body[-effective_window_size]["role"] == "tool"
+        ):
+            effective_window_size += 1
 
         newly_removed = len(body) - effective_window_size
         self._total_truncated += newly_removed
