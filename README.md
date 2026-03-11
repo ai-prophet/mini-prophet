@@ -23,6 +23,7 @@ pip install -e ".[perplexity]"
 `perplexity` is the default search backend, so this is the recommended install.
 If you only use Brave search, `pip install -e .` is enough.
 If you want Exa search, use `pip install -e ".[exa]"`.
+If you want Tavily search, use `pip install -e ".[tavily]"`.
 
 ## Set API keys
 
@@ -33,6 +34,7 @@ Use the built-in CLI to persist keys into prophet's global `.env` file:
 prophet set PERPLEXITY_API_KEY "your-perplexity-key"
 prophet set BRAVE_API_KEY "your-brave-key"
 prophet set EXA_API_KEY "your-exa-key"
+prophet set TAVILY_API_KEY "your-tavily-key"
 
 # Step 2: model API key (if you use OpenRouter, this works with any model)
 prophet set OPENROUTER_API_KEY "your-openrouter-key"

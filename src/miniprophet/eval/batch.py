@@ -313,6 +313,7 @@ def batch_forecast(
 
     if model is None:
         from miniprophet.models import get_model
+
         model = get_model(config=resolved_config.get("model", {}))
     search_backend = get_search_backend(search_cfg=resolved_config.get("search", {}))
 

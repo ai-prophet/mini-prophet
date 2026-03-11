@@ -95,10 +95,7 @@ class SlidingWindowContextManager:
         # Expand the window so we never orphan tool-result messages from
         # their preceding assistant message (which carries the tool_calls).
         effective_window_size = self.window_size
-        while (
-            effective_window_size < len(body)
-            and body[-effective_window_size]["role"] == "tool"
-        ):
+        while effective_window_size < len(body) and body[-effective_window_size]["role"] == "tool":
             effective_window_size += 1
 
         newly_removed = len(body) - effective_window_size
