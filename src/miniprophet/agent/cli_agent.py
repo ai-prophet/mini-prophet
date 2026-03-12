@@ -50,9 +50,21 @@ class CliForecastAgent(DefaultForecastAgent):
         print_run_header(title, outcomes, config.step_limit, config.cost_limit, config.search_limit)
 
     def on_step_start(
-        self, step: int, model_cost: float, search_cost: float, total_cost: float
+        self,
+        step: int,
+        model_cost: float,
+        search_cost: float,
+        total_cost: float,
+        prompt_tokens: int = 0,
+        completion_tokens: int = 0,
+        max_context_tokens: int | None = None,
     ) -> None:
-        print_step_header(step, model_cost, search_cost, total_cost)
+        print_step_header(
+            step, model_cost, search_cost, total_cost,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            max_context_tokens=max_context_tokens,
+        )
 
     def on_model_response(self, message: dict) -> None:
         max_chars = (
@@ -86,6 +98,9 @@ class CliForecastAgent(DefaultForecastAgent):
             self.model_cost,
             self.search_cost,
             self.total_cost,
+            prompt_tokens=self.prompt_tokens,
+            completion_tokens=self.completion_tokens,
+            max_context_tokens=self.max_context_tokens,
         )
 
     # ------------------------------------------------------------------

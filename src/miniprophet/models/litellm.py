@@ -57,12 +57,14 @@ class LitellmModel:
 
         cost_info = self._calculate_cost(response)
         GLOBAL_MODEL_STATS.add(cost_info["cost"])
+        usage_info = self._extract_usage(response)
 
         message = self._build_message(response)
         message["extra"] = {
             "actions": self._parse_actions(response),
             "response": self._dump_response(response),
             **cost_info,
+            **usage_info,
             "timestamp": time.time(),
         }
         return message
@@ -101,6 +103,28 @@ class LitellmModel:
                 self.logger.critical(msg)
                 raise RuntimeError(msg) from e
         return {"cost": cost}
+
+    def _extract_usage(self, response) -> dict[str, int]:
+        """Extract token usage from the LiteLLM response."""
+        usage = getattr(response, "usage", None)
+        if usage is None:
+            return {}
+        return {
+            "prompt_tokens": getattr(usage, "prompt_tokens", 0) or 0,
+            "completion_tokens": getattr(usage, "completion_tokens", 0) or 0,
+            "total_tokens": getattr(usage, "total_tokens", 0) or 0,
+        }
+
+    def get_max_context_tokens(self) -> int | None:
+        """Return the max input token limit for the configured model, or None if unknown."""
+        try:
+            info = litellm.get_model_info(self.config.model_name)
+            return info.get("max_input_tokens")
+        except Exception:
+            self.logger.debug(
+                f"Could not retrieve max context tokens for {self.config.model_name}"
+            )
+            return None
 
     def _build_message(self, response) -> dict:
         return response.choices[0].message.model_dump()
