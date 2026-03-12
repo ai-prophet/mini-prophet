@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 from conftest import DummyEnvironment, DummyModel
 
-from miniprophet.agent.default import GRACE_PERIOD_PROMPT, DefaultForecastAgent
+from miniprophet.agent.default import DefaultForecastAgent
 from miniprophet.exceptions import Submitted
 
 
@@ -30,6 +30,9 @@ class _SubmitEnv(DummyEnvironment):
         return super().execute(action, **kwargs)
 
 
+TEST_GRACE_PROMPT = "Submit now using the submit tool."
+
+
 def _grace_kwargs(tmp_path: Path, **overrides) -> dict:
     defaults = {
         "system_template": "sys: {title}",
@@ -41,6 +44,7 @@ def _grace_kwargs(tmp_path: Path, **overrides) -> dict:
         "output_path": tmp_path,
         "enable_grace_period": True,
         "grace_period_extra_turns": 3,
+        "grace_period_prompt": TEST_GRACE_PROMPT,
     }
     defaults.update(overrides)
     return defaults
@@ -166,7 +170,7 @@ def test_grace_period_prompt_injected_as_user_message(
 
     # Find the grace period prompt in messages
     grace_messages = [
-        m for m in agent.messages if m.get("content") == GRACE_PERIOD_PROMPT and m.get("role") == "user"
+        m for m in agent.messages if m.get("content") == TEST_GRACE_PROMPT and m.get("role") == "user"
     ]
     assert len(grace_messages) >= 1
 

@@ -25,14 +25,6 @@ class ForecastResult(TypedDict, total=False):
     board: list[dict]
 
 
-GRACE_PERIOD_PROMPT = (
-    "You have reached the step limit. You MUST now submit your forecast "
-    "immediately using the `submit` tool. No other actions are allowed. "
-    "Use the evidence you have gathered so far to provide your best "
-    "probabilistic forecast."
-)
-
-
 class AgentConfig(BaseModel):
     system_template: str
     instance_template: str
@@ -44,7 +36,7 @@ class AgentConfig(BaseModel):
     output_path: Path | None = None
     show_current_time: bool = False
     enable_grace_period: bool = False
-    grace_period_prompt: str = GRACE_PERIOD_PROMPT
+    grace_period_prompt: str = ""
     grace_period_extra_turns: int = 3
 
 

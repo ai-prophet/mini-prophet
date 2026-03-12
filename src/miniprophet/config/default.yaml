@@ -41,6 +41,11 @@ agent:
   show_current_time: false
   enable_grace_period: false
   grace_period_extra_turns: 3
+  grace_period_prompt: |
+    You have reached the step limit. You MUST now submit your forecast
+    immediately using the `submit` tool. No other actions are allowed.
+    Use the evidence you have gathered so far to provide your best
+    probabilistic forecast.
 
 model:
   model_class: "litellm"
