@@ -197,10 +197,10 @@ def test_grace_period_custom_prompt(
     assert len(custom_messages) >= 1
 
 
-def test_grace_period_only_submit_tool_schema_provided(
+def test_grace_period_keeps_all_tool_schemas(
     assistant_action_message, tmp_path: Path
 ) -> None:
-    """During grace period, the model only receives the submit tool schema."""
+    """During grace period, all tool schemas are still provided for KV cache friendliness."""
     tools_seen: list[list[dict]] = []
 
     class _RecordingModel(DummyModel):
@@ -218,7 +218,6 @@ def test_grace_period_only_submit_tool_schema_provided(
         ]
     )
 
-    # Environment with explicit submit tool schema
     env = _SubmitEnv()
     env._tools["submit"] = {
         "type": "function",
@@ -228,10 +227,5 @@ def test_grace_period_only_submit_tool_schema_provided(
 
     agent.run(title="Q", outcomes=["Yes", "No"])
 
-    # Last query (grace period) should only have submit tool
-    grace_tools = tools_seen[-1]
-    assert len(grace_tools) == 1
-    assert grace_tools[0]["function"]["name"] == "submit"
-
-    # Earlier queries should have all tools
-    assert len(tools_seen[0]) > 1 or len(tools_seen[0]) >= 1
+    # All queries should receive the same full set of tool schemas
+    assert tools_seen[-1] == tools_seen[0]

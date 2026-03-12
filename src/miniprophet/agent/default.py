@@ -208,10 +208,6 @@ class DefaultForecastAgent:
 
         return self.execute_actions(self.query())
 
-    def _submit_only_tools(self) -> list[dict]:
-        """Return tool schemas filtered to only the submit tool."""
-        return [t for t in self.env.get_tool_schemas() if t.get("function", {}).get("name") == "submit"]
-
     def query(self) -> dict:
         step_limit_hit = 0 < self.config.step_limit <= self.n_calls
         cost_limit_hit = 0 < self.config.cost_limit <= self.total_cost
@@ -250,7 +246,7 @@ class DefaultForecastAgent:
         self.n_calls += 1
         # Snapshot the messages the model will actually see (post-truncation, post-board inject)
         input_snapshot = list(self.messages)
-        tools = self._submit_only_tools() if self._in_grace_period else self.env.get_tool_schemas()
+        tools = self.env.get_tool_schemas()
         message = self.model.query(self.messages, tools)
         self.model_cost += message.get("extra", {}).get("cost", 0.0)
         self.add_messages(message)
