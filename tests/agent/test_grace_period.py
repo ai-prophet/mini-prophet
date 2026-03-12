@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
 from conftest import DummyEnvironment, DummyModel
 
 from miniprophet.agent.default import DefaultForecastAgent
@@ -77,9 +76,7 @@ def test_grace_period_allows_submit_after_step_limit(
     assert agent._grace_period_turns == 1
 
 
-def test_grace_period_rejects_non_submit_tools(
-    assistant_action_message, tmp_path: Path
-) -> None:
+def test_grace_period_rejects_non_submit_tools(assistant_action_message, tmp_path: Path) -> None:
     """Non-submit tool calls during grace period are rejected with grace period prompt."""
     model = DummyModel(
         scripted_messages=[
@@ -104,9 +101,7 @@ def test_grace_period_rejects_non_submit_tools(
     assert agent._grace_period_turns == 2
 
 
-def test_grace_period_exhausted_after_extra_turns(
-    assistant_action_message, tmp_path: Path
-) -> None:
+def test_grace_period_exhausted_after_extra_turns(assistant_action_message, tmp_path: Path) -> None:
     """Agent fails after exhausting all grace period turns without submitting."""
     model = DummyModel(
         scripted_messages=[
@@ -129,9 +124,7 @@ def test_grace_period_exhausted_after_extra_turns(
     assert agent._grace_period_turns == 3
 
 
-def test_grace_period_disabled_fails_immediately(
-    assistant_action_message, tmp_path: Path
-) -> None:
+def test_grace_period_disabled_fails_immediately(assistant_action_message, tmp_path: Path) -> None:
     """Without grace period enabled, step limit causes immediate failure."""
     model = DummyModel(
         scripted_messages=[
@@ -170,14 +163,14 @@ def test_grace_period_prompt_injected_as_user_message(
 
     # Find the grace period prompt in messages
     grace_messages = [
-        m for m in agent.messages if m.get("content") == TEST_GRACE_PROMPT and m.get("role") == "user"
+        m
+        for m in agent.messages
+        if m.get("content") == TEST_GRACE_PROMPT and m.get("role") == "user"
     ]
     assert len(grace_messages) >= 1
 
 
-def test_grace_period_custom_prompt(
-    assistant_action_message, tmp_path: Path
-) -> None:
+def test_grace_period_custom_prompt(assistant_action_message, tmp_path: Path) -> None:
     """Custom grace period prompt is used when configured."""
     custom_prompt = "Custom: submit now!"
     model = DummyModel(
@@ -201,9 +194,7 @@ def test_grace_period_custom_prompt(
     assert len(custom_messages) >= 1
 
 
-def test_grace_period_keeps_all_tool_schemas(
-    assistant_action_message, tmp_path: Path
-) -> None:
+def test_grace_period_keeps_all_tool_schemas(assistant_action_message, tmp_path: Path) -> None:
     """During grace period, all tool schemas are still provided for KV cache friendliness."""
     tools_seen: list[list[dict]] = []
 

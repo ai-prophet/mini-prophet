@@ -253,10 +253,12 @@ class DefaultForecastAgent:
         outputs: list[dict] = []
         for action in actions:
             if self._in_grace_period and action.get("name") != "submit":
-                outputs.append({
-                    "output": self.config.grace_period_prompt,
-                    "error": True,
-                })
+                outputs.append(
+                    {
+                        "output": self.config.grace_period_prompt,
+                        "error": True,
+                    }
+                )
             else:
                 outputs.append(self.env.execute(action, **self.runtime_kwargs))
         for action, output in zip(actions, outputs):
