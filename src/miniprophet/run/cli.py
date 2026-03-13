@@ -9,7 +9,7 @@ import typer
 from rich.prompt import Confirm, Prompt
 
 from miniprophet import __version__
-from miniprophet.cli.components.banner import print_cli_banner
+from miniprophet.cli.components.banner import print_cli_banner, print_run_info
 from miniprophet.cli.utils import get_console
 from miniprophet.utils.serialize import UNSET, recursive_merge
 
@@ -130,6 +130,14 @@ def main(
     )
 
     config = recursive_merge(*configs)
+
+    model_cfg = config.get("model", {})
+    search_cfg_top = config.get("search", {})
+    print_run_info(
+        model_class=model_cfg.get("model_class", "litellm"),
+        model_name=model_cfg.get("model_name", ""),
+        search_class=search_cfg_top.get("search_class", "perplexity"),
+    )
 
     # ---- Forecast loop (re-enter setup in interactive mode) ----
     while True:
