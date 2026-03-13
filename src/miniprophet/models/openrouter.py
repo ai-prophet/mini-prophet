@@ -63,12 +63,14 @@ class OpenRouterModel:
 
         cost_info = self._calculate_cost(response)
         GLOBAL_MODEL_STATS.add(cost_info["cost"])
+        usage_info = self._extract_usage(response)
 
         message = dict(response["choices"][0]["message"])
         message["extra"] = {
             "actions": self._parse_actions(response),
             "response": response,
             **cost_info,
+            **usage_info,
             "timestamp": time.time(),
         }
         return message
@@ -129,6 +131,41 @@ class OpenRouterModel:
                 f"Usage: {usage}. Set cost_tracking='ignore_errors' to suppress."
             )
         return {"cost": cost}
+
+    def _extract_usage(self, response: dict) -> dict[str, int]:
+        """Extract token usage from the OpenRouter response."""
+        usage = response.get("usage", {})
+        return {
+            "prompt_tokens": usage.get("prompt_tokens", 0) or 0,
+            "completion_tokens": usage.get("completion_tokens", 0) or 0,
+            "total_tokens": usage.get("total_tokens", 0) or 0,
+        }
+
+    def get_max_context_tokens(self) -> int | None:
+        """Return the max input token limit via litellm model info, or via OpenRouter API."""
+        # Try litellm first (works for many standard models)
+        try:
+            import litellm
+
+            info = litellm.get_model_info(f"openrouter/{self.config.model_name}")
+            max_input = info.get("max_input_tokens")
+            if max_input:
+                return max_input
+        except Exception:
+            pass
+        # Fallback: query OpenRouter models API
+        try:
+            resp = requests.get(
+                f"https://openrouter.ai/api/v1/models/{self.config.model_name}",
+                headers={"Authorization": f"Bearer {self._api_key}"},
+                timeout=10,
+            )
+            if resp.ok:
+                data = resp.json().get("data", resp.json())
+                return data.get("context_length")
+        except Exception:
+            pass
+        return None
 
     def _parse_actions(self, response: dict) -> list[dict]:
         """Parse tool calls from the API response. Raises FormatError on problems."""

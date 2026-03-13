@@ -60,9 +60,19 @@ class DefaultForecastAgent:
         self.search_cost = 0.0
         self.n_searches = 0
         self.n_calls = 0
+        self.prompt_tokens = 0
+        self.completion_tokens = 0
+        self.max_context_tokens: int | None = None
         self._in_grace_period = False
         self._grace_period_turns = 0
         self._trajectory = TrajectoryRecorder()
+
+        # Resolve max context length from model (best-effort)
+        if hasattr(self.model, "get_max_context_tokens"):
+            try:
+                self.max_context_tokens = self.model.get_max_context_tokens()
+            except Exception:
+                pass
 
     @property
     def total_cost(self) -> float:
@@ -93,9 +103,7 @@ class DefaultForecastAgent:
     def on_run_start(self, title: str, outcomes: str, config: AgentConfig) -> None:
         pass
 
-    def on_step_start(
-        self, step: int, model_cost: float, search_cost: float, total_cost: float
-    ) -> None:
+    def on_step_start(self) -> None:
         pass
 
     def on_model_response(self, message: dict) -> None:
@@ -240,11 +248,14 @@ class DefaultForecastAgent:
         input_snapshot = list(self.messages)
         tools = self.env.get_tool_schemas()
         message = self.model.query(self.messages, tools)
-        self.model_cost += message.get("extra", {}).get("cost", 0.0)
+        extra = message.get("extra", {})
+        self.model_cost += extra.get("cost", 0.0)
+        self.prompt_tokens = extra.get("prompt_tokens", self.prompt_tokens)
+        self.completion_tokens = extra.get("completion_tokens", self.completion_tokens)
         self.add_messages(message)
         self._trajectory.record_step(input_snapshot, message)
 
-        self.on_step_start(self.n_calls, self.model_cost, self.search_cost, self.total_cost)
+        self.on_step_start()
         self.on_model_response(message)
         return message
 
@@ -287,6 +298,11 @@ class DefaultForecastAgent:
                 "total_cost": self.total_cost,
                 "n_api_calls": self.n_calls,
                 "n_searches": self.n_searches,
+            },
+            "token_usage": {
+                "prompt_tokens": self.prompt_tokens,
+                "completion_tokens": self.completion_tokens,
+                "max_context_tokens": self.max_context_tokens,
             },
             "config": {
                 "agent": self.config.model_dump(mode="json"),

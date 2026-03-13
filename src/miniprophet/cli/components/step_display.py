@@ -6,14 +6,28 @@ import json
 
 from rich.panel import Panel
 
-from miniprophet.cli.utils import get_console
+from miniprophet.cli.utils import format_token_summary, get_console
 
 console = get_console()
 
 
-def print_step_header(step: int, model_cost: float, search_cost: float, total_cost: float) -> None:
+def print_step_header(
+    step: int,
+    model_cost: float,
+    search_cost: float,
+    total_cost: float,
+    *,
+    prompt_tokens: int = 0,
+    completion_tokens: int = 0,
+    max_context_tokens: int | None = None,
+) -> None:
     cost_str = f"model=${model_cost:.4f}  search=${search_cost:.4f}  total=${total_cost:.4f}"
-    console.rule(f"[bold]Step {step}[/bold]  |  {cost_str}", style="cyan")
+    parts = [f"[bold]Step {step}[/bold]  |  {cost_str}"]
+
+    if prompt_tokens > 0:
+        parts.append(format_token_summary(prompt_tokens, completion_tokens, max_context_tokens))
+
+    console.rule("  ".join(parts), style="cyan")
 
 
 def print_model_response(message: dict, *, max_thinking_chars: int = 500) -> None:

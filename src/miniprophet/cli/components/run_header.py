@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from rich.console import Console
+from miniprophet.cli.utils import format_token_summary, get_console
 
-console = Console()
+console = get_console()
 
 
 def print_run_header(
@@ -28,13 +28,23 @@ def print_run_footer(
     model_cost: float,
     search_cost: float,
     total_cost: float,
+    *,
+    prompt_tokens: int = 0,
+    completion_tokens: int = 0,
+    max_context_tokens: int | None = None,
 ) -> None:
     console.print()
     console.rule("[bold magenta]Agent Finished[/bold magenta]", style="magenta")
-    console.print(
-        f"  [bold]Status:[/bold]   {exit_status}\n"
-        f"  [bold]Steps:[/bold]    {n_calls}   Searches: {n_searches}\n"
+    lines = [
+        f"  [bold]Status:[/bold]   {exit_status}",
+        f"  [bold]Steps:[/bold]    {n_calls}   Searches: {n_searches}",
         f"  [bold]Cost:[/bold]     model=${model_cost:.4f}  "
-        f"search=${search_cost:.4f}  total=${total_cost:.4f}"
-    )
+        f"search=${search_cost:.4f}  total=${total_cost:.4f}",
+    ]
+    if prompt_tokens > 0:
+        lines.append(
+            f"  [bold]Tokens:[/bold]   "
+            f"{format_token_summary(prompt_tokens, completion_tokens, max_context_tokens)}"
+        )
+    console.print("\n".join(lines))
     console.print()
