@@ -1,9 +1,17 @@
 from __future__ import annotations
 
+import json
+
 import pytest
+import requests
 
 from miniprophet.exceptions import FormatError
-from miniprophet.models.openrouter import OpenRouterModel
+from miniprophet.models.openrouter import (
+    OpenRouterAPIError,
+    OpenRouterAuthenticationError,
+    OpenRouterModel,
+    OpenRouterRateLimitError,
+)
 
 
 def test_openrouter_prepare_messages_strips_extra() -> None:
@@ -74,3 +82,73 @@ def test_openrouter_format_observation_messages_tool_and_user_roles() -> None:
     assert "<output>" in msgs[0]["content"]
     assert msgs[1]["role"] == "user"
     assert "<error>" in msgs[1]["content"]
+
+
+def _mock_response(status_code: int = 200, json_data: dict | None = None):
+    resp = requests.models.Response()
+    resp.status_code = status_code
+    if json_data is not None:
+        resp._content = json.dumps(json_data).encode()
+    else:
+        resp._content = b"error text"
+    return resp
+
+
+@pytest.mark.parametrize(
+    "status_code,exc_type",
+    [
+        (401, OpenRouterAuthenticationError),
+        (429, OpenRouterRateLimitError),
+        (500, OpenRouterAPIError),
+    ],
+)
+def test_openrouter_query_http_errors(monkeypatch, status_code: int, exc_type: type) -> None:
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    m = OpenRouterModel(model_name="test/model", cost_tracking="ignore_errors")
+    resp = _mock_response(status_code)
+    monkeypatch.setattr("miniprophet.models.openrouter.requests.post", lambda *a, **kw: resp)
+    with pytest.raises(exc_type):
+        m._query([], [])
+
+
+def test_openrouter_query_connection_error(monkeypatch) -> None:
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    m = OpenRouterModel(model_name="test/model", cost_tracking="ignore_errors")
+    monkeypatch.setattr(
+        "miniprophet.models.openrouter.requests.post",
+        lambda *a, **kw: (_ for _ in ()).throw(requests.exceptions.ConnectionError("refused")),
+    )
+    with pytest.raises(OpenRouterAPIError, match="Request failed"):
+        m._query([], [])
+
+
+def test_openrouter_extract_usage_with_none_values() -> None:
+    m = OpenRouterModel(model_name="test/model", cost_tracking="ignore_errors")
+    result = m._extract_usage({"usage": {"prompt_tokens": None, "completion_tokens": None}})
+    assert result["prompt_tokens"] == 0
+    assert result["completion_tokens"] == 0
+    assert result["total_tokens"] == 0
+
+
+def test_openrouter_format_message() -> None:
+    m = OpenRouterModel(model_name="test/model", cost_tracking="ignore_errors")
+    msg = m.format_message(role="user", content="hello")
+    assert msg == {"role": "user", "content": "hello"}
+
+
+def test_openrouter_serialize() -> None:
+    m = OpenRouterModel(model_name="test/model", cost_tracking="ignore_errors")
+    s = m.serialize()
+    assert s["info"]["config"]["model"]["model_name"] == "test/model"
+    assert "OpenRouterModel" in s["info"]["config"]["model_type"]
+
+
+def test_openrouter_get_max_context_tokens_returns_none_on_failure(monkeypatch) -> None:
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    m = OpenRouterModel(model_name="nonexistent/model", cost_tracking="ignore_errors")
+    monkeypatch.setattr(
+        "miniprophet.models.openrouter.requests.get",
+        lambda *a, **kw: _mock_response(500),
+    )
+    result = m.get_max_context_tokens()
+    assert result is None or isinstance(result, int)

@@ -122,26 +122,22 @@ class TestExaSearch:
         assert client.last_payload["start_published_date"] == "2026-01-01T00:00:00Z"
         assert client.last_payload["end_published_date"] == "2026-03-01T23:59:59Z"
 
-    def test_401_raises_auth_error(
-        self, backend_and_client: tuple[ExaSearchBackend, _FakeExaClient]
+    @pytest.mark.parametrize(
+        "status_code,exc_type,match",
+        [
+            (401, SearchAuthError, "authentication failed"),
+            (429, SearchRateLimitError, "rate limit"),
+        ],
+    )
+    def test_http_error_raises_expected(
+        self, backend_and_client: tuple[ExaSearchBackend, _FakeExaClient],
+        status_code: int, exc_type: type, match: str,
     ) -> None:
         backend, client = backend_and_client
-        exc = Exception("Unauthorized")
-        exc.status_code = 401  # type: ignore[attr-defined]
+        exc = Exception("error")
+        exc.status_code = status_code  # type: ignore[attr-defined]
         client._raise = exc
-
-        with pytest.raises(SearchAuthError, match="authentication failed"):
-            backend.search("test")
-
-    def test_429_raises_rate_limit_error(
-        self, backend_and_client: tuple[ExaSearchBackend, _FakeExaClient]
-    ) -> None:
-        backend, client = backend_and_client
-        exc = Exception("Rate limited")
-        exc.status_code = 429  # type: ignore[attr-defined]
-        client._raise = exc
-
-        with pytest.raises(SearchRateLimitError, match="rate limit"):
+        with pytest.raises(exc_type, match=match):
             backend.search("test")
 
     def test_generic_error_raises_network_error(
@@ -149,7 +145,6 @@ class TestExaSearch:
     ) -> None:
         backend, client = backend_and_client
         client._raise = RuntimeError("connection failed")
-
         with pytest.raises(SearchNetworkError, match="request failed"):
             backend.search("test")
 
@@ -191,22 +186,22 @@ class TestExaSnippetExtraction:
 
 
 class TestExaHelpers:
-    def test_get_field_dict(self) -> None:
-        assert ExaSearchBackend._get_field({"a": 1}, "a") == 1
-        assert ExaSearchBackend._get_field({"a": 1}, "b") is None
+    @pytest.mark.parametrize(
+        "obj,key,expected",
+        [
+            ({"a": 1}, "a", 1),
+            ({"a": 1}, "b", None),
+            (types.SimpleNamespace(x=42), "x", 42),
+            (types.SimpleNamespace(x=42), "y", None),
+            (None, "x", None),
+        ],
+    )
+    def test_get_field(self, obj, key, expected) -> None:
+        assert ExaSearchBackend._get_field(obj, key) == expected
 
-    def test_get_field_object(self) -> None:
-        obj = types.SimpleNamespace(x=42)
-        assert ExaSearchBackend._get_field(obj, "x") == 42
-        assert ExaSearchBackend._get_field(obj, "y") is None
-
-    def test_get_field_none(self) -> None:
-        assert ExaSearchBackend._get_field(None, "x") is None
-
-    def test_as_str(self) -> None:
-        assert ExaSearchBackend._as_str("hello") == "hello"
-        assert ExaSearchBackend._as_str(123) == ""
-        assert ExaSearchBackend._as_str(None) == ""
+    @pytest.mark.parametrize("val,expected", [("hello", "hello"), (123, ""), (None, "")])
+    def test_as_str(self, val, expected) -> None:
+        assert ExaSearchBackend._as_str(val) == expected
 
     def test_build_contents_payload_text(
         self, backend_and_client: tuple[ExaSearchBackend, _FakeExaClient]
