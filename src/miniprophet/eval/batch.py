@@ -114,7 +114,6 @@ def _process_problem(
     total_cost_ref: list[float],
     cost_lock: threading.Lock,
     agent_name: str | None,
-    agent_import_path: str | None,
     agent_class: type | None,
     agent_kwargs: dict[str, Any],
     search_date_before: str | None,
@@ -161,7 +160,7 @@ def _process_problem(
         ctx_mgr = get_context_manager(cm_cfg)
 
         resolved_kwargs = dict(agent_kwargs)
-        if not agent_import_path and agent_class is None:
+        if agent_class is None:
             resolved_kwargs = {**agent_cfg, **resolved_kwargs}
 
         agent = EvalAgentFactory.create(
@@ -169,7 +168,6 @@ def _process_problem(
             env=env,
             context_manager=ctx_mgr,
             agent_name=agent_name,
-            agent_import_path=agent_import_path,
             agent_class=agent_class,
             agent_kwargs=resolved_kwargs,
             task_id=task_id,
@@ -278,10 +276,10 @@ def batch_forecast(
     on_progress: BatchProgressCallback | None = None,
     include_trajectory: bool = False,
     agent_name: str | None = None,
-    agent_import_path: str | None = None,
     agent_class: type | None = None,
     agent_kwargs: dict[str, Any] | None = None,
     model: Any | None = None,
+    search_backend: Any | None = None,
 ) -> list[ForecastResult]:
     """Run forecasting problems in parallel and return results.
 
@@ -296,18 +294,18 @@ def batch_forecast(
         on_progress: Optional callback for progress updates.
         include_trajectory: If True, include agent trajectory in results.
         agent_name: Built-in agent name (default: "default").
-        agent_import_path: Import path for custom agent ("module.path:ClassName").
-        agent_class: Agent class directly (alternative to agent_import_path).
+        agent_class: Agent class directly.
         agent_kwargs: Extra kwargs forwarded to the agent constructor.
         model: Pre-constructed model instance satisfying the Model protocol.
             When provided, ``get_model()`` is skipped and this model is shared
             across all workers.  Useful for injecting an external LLM adapter.
+        search_backend: Pre-constructed search backend instance.
+            When provided, ``get_search_backend()`` is skipped and this backend
+            is shared across all workers.
 
     Returns:
         List of ForecastResult, one per input problem, in the same order.
     """
-    from miniprophet.tools.search import get_search_backend
-
     resolved_config = _load_config(config)
     resolved_kwargs = dict(agent_kwargs or {})
 
@@ -315,7 +313,10 @@ def batch_forecast(
         from miniprophet.models import get_model
 
         model = get_model(config=resolved_config.get("model", {}))
-    search_backend = get_search_backend(search_cfg=resolved_config.get("search", {}))
+    if search_backend is None:
+        from miniprophet.tools.search import get_search_backend
+
+        search_backend = get_search_backend(search_cfg=resolved_config.get("search", {}))
 
     coordinator = RateLimitCoordinator()
     cost_lock = threading.Lock()
@@ -359,7 +360,6 @@ def batch_forecast(
                     total_cost_ref=total_cost_ref,
                     cost_lock=cost_lock,
                     agent_name=agent_name,
-                    agent_import_path=agent_import_path,
                     agent_class=agent_class,
                     agent_kwargs=resolved_kwargs,
                     search_date_before=search_date_before,

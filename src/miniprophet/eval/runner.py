@@ -90,7 +90,7 @@ class EvalRunArgs:
     search_date_after: str | None = None
     dataset_info: dict[str, Any] = field(default_factory=dict)
     agent_name: str | None = None
-    agent_import_path: str | None = None
+    agent_class: type | None = None
     agent_kwargs: dict[str, Any] = field(default_factory=dict)
 
 
@@ -142,7 +142,6 @@ def _write_summary(args: EvalRunArgs, state: EvalRunState) -> None:
         "eval": {
             **args.dataset_info,
             "agent_name": args.agent_name or "default",
-            "agent_import_path": args.agent_import_path,
         },
         "total_cost": state.total_cost_ref[0],
         "runs": [r.to_dict() for r in state.results.values()],
@@ -198,7 +197,7 @@ def process_problem(
         ctx_mgr = get_context_manager(cm_cfg)
 
         agent_kwargs = dict(args.agent_kwargs)
-        if not args.agent_import_path:
+        if args.agent_class is None:
             agent_kwargs = {**agent_cfg, **agent_kwargs}
 
         agent = EvalAgentFactory.create(
@@ -206,7 +205,7 @@ def process_problem(
             env=env,
             context_manager=ctx_mgr,
             agent_name=args.agent_name,
-            agent_import_path=args.agent_import_path,
+            agent_class=args.agent_class,
             agent_kwargs=agent_kwargs,
             task_id=task_id,
             coordinator=state.coordinator,

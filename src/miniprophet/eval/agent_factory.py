@@ -42,15 +42,11 @@ class EvalAgentFactory:
         cls,
         *,
         agent_name: str | None,
-        agent_import_path: str | None,
         agent_class: type | None,
     ) -> type:
         """Resolve to a concrete agent class from the various input forms."""
         if agent_class is not None:
             return agent_class
-
-        if agent_import_path:
-            return cls._import_agent_class(agent_import_path)
 
         # Built-in default agent
         resolved_name = (agent_name or cls.DEFAULT_AGENT_NAME).strip().lower()
@@ -72,7 +68,6 @@ class EvalAgentFactory:
         env: Environment,
         context_manager: ContextManager | None,
         agent_name: str | None = None,
-        agent_import_path: str | None = None,
         agent_class: type | None = None,
         agent_kwargs: dict[str, Any],
         task_id: str,
@@ -82,7 +77,6 @@ class EvalAgentFactory:
     ) -> EvalBatchAgentWrapper:
         agent_cls = cls._resolve_agent_class(
             agent_name=agent_name,
-            agent_import_path=agent_import_path,
             agent_class=agent_class,
         )
 

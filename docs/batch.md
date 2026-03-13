@@ -47,9 +47,10 @@ def batch_forecast(
     on_progress: BatchProgressCallback | None = None,
     include_trajectory: bool = False,
     agent_name: str | None = None,
-    agent_import_path: str | None = None,
     agent_class: type | None = None,
     agent_kwargs: dict[str, Any] | None = None,
+    model: Model | None = None,
+    search_backend: Any | None = None,
 ) -> list[ForecastResult]:
 ```
 
@@ -65,9 +66,10 @@ def batch_forecast(
 | `on_progress` | Optional `BatchProgressCallback` for progress updates |
 | `include_trajectory` | If `True`, include agent trajectory in each result |
 | `agent_name` | Built-in agent alias (currently only `"default"`) |
-| `agent_import_path` | Import path for a custom agent class (`"module.path:ClassName"`) |
-| `agent_class` | Agent class directly (alternative to `agent_import_path`) |
+| `agent_class` | Agent class directly |
 | `agent_kwargs` | Extra kwargs forwarded to the agent constructor |
+| `model` | Pre-constructed `Model` instance (skips `get_model()` when provided) |
+| `search_backend` | Pre-constructed search backend instance (skips `get_search_backend()` when provided) |
 
 Returns a `list[ForecastResult]` in the same order as the input problems.
 
@@ -118,7 +120,7 @@ class BatchProgressCallback(Protocol):
 
 ## Using a custom agent
 
-There are three ways to provide a custom agent:
+There are two ways to provide a custom agent:
 
 ### 1. Pass the class directly
 
@@ -132,16 +134,7 @@ results = batch_forecast(
 )
 ```
 
-### 2. Pass an import path
-
-```python
-results = batch_forecast(
-    problems,
-    agent_import_path="mypackage.agents:MyForecastAgent",
-)
-```
-
-### 3. Use the CLI equivalent
+### 2. Use the CLI with an import path
 
 ```bash
 prophet eval -f tasks.jsonl --agent-import-path mypackage.agents:MyForecastAgent

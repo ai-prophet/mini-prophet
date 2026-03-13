@@ -303,6 +303,16 @@ def main(
     eval_cfg = config.get("eval", {})
     timeout_seconds = max(0.0, float(eval_cfg.get("timeout", 180.0)))
 
+    resolved_agent_class: type | None = None
+    if agent_import_path:
+        from miniprophet.eval.agent_factory import EvalAgentFactory
+
+        try:
+            resolved_agent_class = EvalAgentFactory._import_agent_class(agent_import_path)
+        except ValueError as exc:
+            console.print(f"[bold red]Error:[/bold red] {exc}")
+            raise typer.Exit(1) from exc
+
     run_args = EvalRunArgs(
         output_dir=out_dir,
         config=config,
@@ -315,7 +325,7 @@ def main(
         search_date_after=search_date_after,
         dataset_info=dataset_info,
         agent_name=agent_name,
-        agent_import_path=agent_import_path,
+        agent_class=resolved_agent_class,
         agent_kwargs=parsed_agent_kwargs,
     )
 

@@ -75,36 +75,6 @@ def main(
     from miniprophet.tools.search import get_search_backend
 
     print_cli_banner(__version__, mode_label="single run")
-
-    # ---- Resolve title, outcomes, ground_truth ----
-    ground_truth: dict[str, int] | None = None
-    if ground_truth_json:
-        try:
-            ground_truth = json.loads(ground_truth_json)
-        except json.JSONDecodeError as exc:
-            console.print(f"[bold red]Error:[/bold red] Invalid --ground-truth JSON: {exc}")
-            raise typer.Exit(1)
-
-    if interactive:
-        resolved_title, outcome_list, ground_truth = _interactive_flow(
-            prefill_title=title or "",
-            prefill_outcomes=outcomes,
-            prefill_ground_truth=ground_truth,
-        )
-    else:
-        if not title or not outcomes:
-            console.print(
-                "[bold red]Error:[/bold red] --title and --outcomes are required "
-                "(or use --interactive / -i)."
-            )
-            raise typer.Exit(1)
-        resolved_title = title
-        outcome_list = [o.strip() for o in outcomes.split(",") if o.strip()]
-
-    if len(outcome_list) < 2:
-        console.print("[bold red]Error:[/bold red] At least 2 outcomes are required.")
-        raise typer.Exit(1)
-
     # ---- Load and merge configs ----
     configs = [get_config_from_spec("default")]
     for spec in config_spec or []:
@@ -138,6 +108,35 @@ def main(
         model_name=model_cfg.get("model_name", ""),
         search_class=search_cfg_top.get("search_class", "perplexity"),
     )
+
+    # ---- Resolve title, outcomes, ground_truth ----
+    ground_truth: dict[str, int] | None = None
+    if ground_truth_json:
+        try:
+            ground_truth = json.loads(ground_truth_json)
+        except json.JSONDecodeError as exc:
+            console.print(f"[bold red]Error:[/bold red] Invalid --ground-truth JSON: {exc}")
+            raise typer.Exit(1)
+
+    if interactive:
+        resolved_title, outcome_list, ground_truth = _interactive_flow(
+            prefill_title=title or "",
+            prefill_outcomes=outcomes,
+            prefill_ground_truth=ground_truth,
+        )
+    else:
+        if not title or not outcomes:
+            console.print(
+                "[bold red]Error:[/bold red] --title and --outcomes are required "
+                "(or use --interactive / -i)."
+            )
+            raise typer.Exit(1)
+        resolved_title = title
+        outcome_list = [o.strip() for o in outcomes.split(",") if o.strip()]
+
+    if len(outcome_list) < 2:
+        console.print("[bold red]Error:[/bold red] At least 2 outcomes are required.")
+        raise typer.Exit(1)
 
     # ---- Forecast loop (re-enter setup in interactive mode) ----
     while True:

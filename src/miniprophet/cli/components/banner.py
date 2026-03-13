@@ -34,5 +34,5 @@ def print_cli_banner(version: str, *, mode_label: str | None = None) -> None:
 
 def print_run_info(*, model_class: str, model_name: str, search_class: str) -> None:
     """Display the active model and searcher after config resolution."""
-    console.print(f"  Model:    [bold cyan]{model_class}:{model_name}[/bold cyan]")
+    console.print(f"  Model:    [bold cyan]{model_name} (via {model_class})[/bold cyan]")
     console.print(f"  Searcher: [bold cyan]{search_class}[/bold cyan]\n")
