@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import signal
+
 from rich.live import Live
+from rich.prompt import Prompt
 from rich.spinner import Spinner
 
 from miniprophet import ContextManager, Environment, Model
@@ -20,6 +23,7 @@ console = get_console()
 class CliAgentConfig(AgentConfig):
     show_thinking: bool = True
     max_display_chars: int = 500
+    enable_interrupt: bool = True
 
 
 class CliForecastAgent(DefaultForecastAgent):
@@ -41,6 +45,9 @@ class CliForecastAgent(DefaultForecastAgent):
             config_class=config_class,
             **kwargs,
         )
+        # For interactive mode signal handling
+        self._interrupt_requested: bool = False
+        self._original_sigint_handler: signal.Handlers | None = None
 
     # ------------------------------------------------------------------
     # Hook overrides
@@ -98,14 +105,112 @@ class CliForecastAgent(DefaultForecastAgent):
         )
 
     # ------------------------------------------------------------------
-    # Override step to show context truncation notice
+    # Interactive interrupt: signal handling
+    # ------------------------------------------------------------------
+
+    def _handle_sigint(self, signum: int, frame: object) -> None:
+        """Custom SIGINT handler: first Ctrl+C sets flag, second hard-aborts."""
+        if self._interrupt_requested:
+            # Second Ctrl+C: restore default handler and hard-abort.
+            signal.signal(signal.SIGINT, signal.SIG_DFL)
+            console.print("\n[bold red]  Hard abort (double Ctrl+C).[/bold red]")
+            raise KeyboardInterrupt
+        self._interrupt_requested = True
+        console.print(
+            "\n[bold yellow]  Interrupt received. "
+            "Will pause after current operation...[/bold yellow]"
+        )
+
+    def _prompt_user_message(self) -> None:
+        """Pause the agent and prompt the user for a message to inject."""
+        self._interrupt_requested = False
+
+        console.print()
+        console.rule("[bold yellow]Agent Paused[/bold yellow]", style="yellow")
+        console.print(
+            "  [dim]Type your message to the agent, or press Enter to resume without a message.[/dim]"
+        )
+        console.print("  [dim]Press Ctrl+C again to abort.[/dim]")
+
+        # Temporarily restore original SIGINT so Ctrl+C during input aborts.
+        if self._original_sigint_handler is not None:
+            signal.signal(signal.SIGINT, self._original_sigint_handler)
+
+        try:
+            user_input = Prompt.ask("  [bold cyan]Message[/bold cyan]", default="")
+        except (KeyboardInterrupt, EOFError):
+            console.print("\n[bold red]  Aborting.[/bold red]")
+            raise KeyboardInterrupt
+        finally:
+            # Re-install our handler for the resumed run.
+            if self._original_sigint_handler is not None:
+                signal.signal(signal.SIGINT, self._handle_sigint)
+
+        if user_input.strip():
+            self.add_messages(
+                self.model.format_message(
+                    role="user",
+                    content=user_input.strip(),
+                    extra={"is_user_interrupt": True},
+                )
+            )
+            console.print("  [green]Message injected. Resuming...[/green]")
+        else:
+            console.print("  [dim]No message. Resuming...[/dim]")
+
+        console.rule(style="yellow")
+        console.print()
+
+    # ------------------------------------------------------------------
+    # Override run to install/restore signal handler
+    # ------------------------------------------------------------------
+
+    def run(
+        self,
+        title: str,
+        outcomes: list[str],
+        ground_truth: dict[str, int] | None = None,
+        **runtime_kwargs,
+    ) -> ForecastResult:
+        interactive = getattr(self.config, "enable_interrupt", False)
+        if interactive:
+            self._original_sigint_handler = signal.getsignal(signal.SIGINT)
+            signal.signal(signal.SIGINT, self._handle_sigint)
+        try:
+            return super().run(title, outcomes, ground_truth, **runtime_kwargs)
+        finally:
+            if self._original_sigint_handler is not None:
+                signal.signal(signal.SIGINT, self._original_sigint_handler)
+                self._original_sigint_handler = None
+
+    # ------------------------------------------------------------------
+    # Override step: interrupt check points + context truncation display
     # ------------------------------------------------------------------
 
     def step(self) -> list[dict]:
-        result = super().step()
+        self._prepare_messages_for_step()
+
+        message = self.query()
+
+        has_actions = bool(message.get("extra", {}).get("actions", []))
+
+        # Interrupt after query, no tool actions: A -> C
+        if self._interrupt_requested and not has_actions:
+            self._prompt_user_message()
+            if self.context_manager is not None:
+                self.context_manager.display()
+            return list(self.messages)
+
+        # Execute tool actions
+        result = self.execute_actions(message)
+
+        # Interrupt after tool execution: A -> B -> C
+        if self._interrupt_requested:
+            self._prompt_user_message()
 
         if self.context_manager is not None:
             self.context_manager.display()
+
         return result
 
     # ------------------------------------------------------------------
