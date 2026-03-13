@@ -43,3 +43,41 @@ def test_search_tool_execute_bubbles_auth_error() -> None:
     tool = SearchForecastTool(DummySearchTool(error=SearchAuthError("bad key")), {})
     with pytest.raises(SearchAuthError):
         tool.execute({"query": "x"})
+
+
+def test_search_tool_search_limit_reached() -> None:
+    tool = SearchForecastTool(DummySearchTool(), {}, search_limit=1)
+    tool.n_searches = 1
+    output = tool.execute({"query": "x"})
+    assert output["error"] is True
+    assert "Search limit reached" in output["output"]
+
+
+def test_search_tool_no_results_message() -> None:
+    tool = SearchForecastTool(DummySearchTool(sources=[]), {}, search_limit=5)
+    output = tool.execute({"query": "x"})
+    assert "No sources found" in output["output"]
+
+
+def test_search_tool_get_schema_with_backend_params() -> None:
+    backend = DummySearchTool()
+    tool = SearchForecastTool(backend, {})
+    schema = tool.get_schema()
+    assert schema["function"]["name"] == "search"
+    # DummySearchTool has search_parameters_schema so it should be used
+    assert schema["function"]["parameters"]["properties"]["query"]["type"] == "string"
+
+
+def test_search_tool_get_schema_without_backend_params() -> None:
+    class NoSchemaBackend:
+        def search(self, query, limit=5, **kw):
+            from miniprophet.tools.search import SearchResult
+
+            return SearchResult(sources=[], cost=0.0)
+
+        def serialize(self):
+            return {}
+
+    tool = SearchForecastTool(NoSchemaBackend(), {})
+    schema = tool.get_schema()
+    assert schema["function"]["parameters"]["required"] == ["query"]

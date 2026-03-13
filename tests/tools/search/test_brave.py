@@ -64,41 +64,36 @@ class TestBraveGetLinks:
         assert links[0]["date"] == "2d"
         assert links[1]["date"] is None
 
-    def test_401_raises_auth_error(
-        self, backend: BraveSearchBackend, monkeypatch: pytest.MonkeyPatch
+    @pytest.mark.parametrize(
+        "status_code,exc_type,match",
+        [
+            (401, SearchAuthError, "authentication failed"),
+            (429, SearchRateLimitError, "rate limit"),
+            (500, SearchNetworkError, "HTTP 500"),
+        ],
+    )
+    def test_http_error_raises_expected(
+        self,
+        backend: BraveSearchBackend,
+        monkeypatch: pytest.MonkeyPatch,
+        status_code: int,
+        exc_type: type,
+        match: str,
     ) -> None:
-        resp = _mock_response(401)
-
-        def mock_get(*a, **kw):
-            resp.raise_for_status()
-
+        resp = _mock_response(status_code, text="Internal Server Error")
         monkeypatch.setattr("miniprophet.tools.search.brave.requests.get", lambda *a, **kw: resp)
-        with pytest.raises(SearchAuthError, match="authentication failed"):
-            backend._get_links("test", 5)
-
-    def test_429_raises_rate_limit_error(
-        self, backend: BraveSearchBackend, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        resp = _mock_response(429)
-        monkeypatch.setattr("miniprophet.tools.search.brave.requests.get", lambda *a, **kw: resp)
-        with pytest.raises(SearchRateLimitError, match="rate limit"):
-            backend._get_links("test", 5)
-
-    def test_500_raises_network_error(
-        self, backend: BraveSearchBackend, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        resp = _mock_response(500, text="Internal Server Error")
-        monkeypatch.setattr("miniprophet.tools.search.brave.requests.get", lambda *a, **kw: resp)
-        with pytest.raises(SearchNetworkError, match="HTTP 500"):
+        with pytest.raises(exc_type, match=match):
             backend._get_links("test", 5)
 
     def test_connection_error_raises_network_error(
         self, backend: BraveSearchBackend, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        def raise_conn_err(*a, **kw):
-            raise requests.exceptions.ConnectionError("connection refused")
-
-        monkeypatch.setattr("miniprophet.tools.search.brave.requests.get", raise_conn_err)
+        monkeypatch.setattr(
+            "miniprophet.tools.search.brave.requests.get",
+            lambda *a, **kw: (_ for _ in ()).throw(
+                requests.exceptions.ConnectionError("connection refused")
+            ),
+        )
         with pytest.raises(SearchNetworkError, match="request failed"):
             backend._get_links("test", 5)
 

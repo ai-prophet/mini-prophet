@@ -7,12 +7,19 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from miniprophet.eval.batch import _load_config, batch_forecast
+from miniprophet.eval.batch import (
+    _is_auth_error,
+    _is_rate_limit_error,
+    _load_config,
+    _run_agent_with_timeout,
+    batch_forecast,
+)
 from miniprophet.eval.types import (
     BatchProgressCallback,
     ForecastProblem,
     ForecastResult,
 )
+from miniprophet.exceptions import BatchRunTimeoutError, SearchRateLimitError
 
 
 class _SimpleAgent:
@@ -218,3 +225,113 @@ def test_batch_forecast_cost_limit(mock_get_model: MagicMock, mock_get_search: M
     # First runs fine, second hits cost limit
     assert results[0].status == "submitted"
     assert results[1].status == "skipped_cost_limit"
+
+
+class TestIsRateLimitError:
+    @pytest.mark.parametrize(
+        "exc,expected",
+        [
+            (SearchRateLimitError("limit"), True),
+            (Exception("got 429 from server"), True),
+            (Exception("rate limit exceeded"), True),
+            (Exception("something else"), False),
+            (RuntimeError("timeout"), False),
+        ],
+    )
+    def test_detection(self, exc: Exception, expected: bool) -> None:
+        assert _is_rate_limit_error(exc) == expected
+
+
+class TestIsAuthError:
+    @pytest.mark.parametrize(
+        "exc,expected",
+        [
+            (type("AuthenticationError", (Exception,), {})("fail"), True),
+            (Exception("authentication failed"), True),
+            (Exception("unauthorized access"), True),
+            (Exception("invalid api key"), True),
+            (Exception("HTTP 401"), True),
+            (Exception("status code 401"), True),
+            (Exception("something else"), False),
+        ],
+    )
+    def test_detection(self, exc: Exception, expected: bool) -> None:
+        assert _is_auth_error(exc) == expected
+
+
+def test_load_config_invalid_type_raises() -> None:
+    with pytest.raises(TypeError, match="config must be"):
+        _load_config(42)  # type: ignore[arg-type]
+
+
+class TestRunAgentWithTimeout:
+    def test_no_timeout(self) -> None:
+        class Agent:
+            def run(self, **kw):
+                return {"exit_status": "done"}
+
+        import threading
+
+        result = _run_agent_with_timeout(
+            agent=Agent(),
+            timeout_seconds=0,
+            cancel_event=threading.Event(),
+            title="t",
+            outcomes=["A"],
+            ground_truth=None,
+            runtime_kwargs={},
+        )
+        assert result == {"exit_status": "done"}
+
+    def test_timeout_fires(self) -> None:
+        import threading
+
+        cancel_event = threading.Event()
+        cancel_event.set()  # Pre-set to simulate timeout
+
+        class Agent:
+            def run(self, **kw):
+                return {}
+
+        with pytest.raises(BatchRunTimeoutError):
+            _run_agent_with_timeout(
+                agent=Agent(),
+                timeout_seconds=1,
+                cancel_event=cancel_event,
+                title="t",
+                outcomes=["A"],
+                ground_truth=None,
+                runtime_kwargs={},
+            )
+
+
+@patch("miniprophet.tools.search.get_search_backend")
+def test_batch_forecast_with_prebuilt_model(mock_get_search: MagicMock) -> None:
+    mock_get_search.return_value = MagicMock()
+
+    class FakeModel:
+        class config:
+            model_name = "fake"
+
+        def query(self, *a, **kw):
+            return {}
+
+        def format_message(self, **kw):
+            return kw
+
+        def format_observation_messages(self, msg, out):
+            return []
+
+        def serialize(self):
+            return {"info": {"config": {"model": {}}}}
+
+    problems = _make_problems(1)
+    results = batch_forecast(
+        problems,
+        config={"model": {"model_name": "test/m"}},
+        agent_class=_SimpleAgent,
+        model=FakeModel(),
+        timeout_seconds=10.0,
+    )
+    assert len(results) == 1
+    assert results[0].status == "submitted"

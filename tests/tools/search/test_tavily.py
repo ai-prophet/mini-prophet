@@ -166,26 +166,25 @@ class TestTavilySearch:
         with pytest.raises(SearchRateLimitError, match="usage limit"):
             backend.search("test")
 
-    def test_401_raises_auth_error(
-        self, backend_and_client: tuple[TavilySearchBackend, _FakeTavilyClient]
+    @pytest.mark.parametrize(
+        "status_code,exc_type,match",
+        [
+            (401, SearchAuthError, "authentication failed"),
+            (429, SearchRateLimitError, "rate limit"),
+        ],
+    )
+    def test_http_error_raises_expected(
+        self,
+        backend_and_client: tuple[TavilySearchBackend, _FakeTavilyClient],
+        status_code: int,
+        exc_type: type,
+        match: str,
     ) -> None:
         backend, client = backend_and_client
-        exc = Exception("Unauthorized")
-        exc.status_code = 401  # type: ignore[attr-defined]
+        exc = Exception("error")
+        exc.status_code = status_code  # type: ignore[attr-defined]
         client._raise = exc
-
-        with pytest.raises(SearchAuthError, match="authentication failed"):
-            backend.search("test")
-
-    def test_429_raises_rate_limit_error(
-        self, backend_and_client: tuple[TavilySearchBackend, _FakeTavilyClient]
-    ) -> None:
-        backend, client = backend_and_client
-        exc = Exception("Rate limited")
-        exc.status_code = 429  # type: ignore[attr-defined]
-        client._raise = exc
-
-        with pytest.raises(SearchRateLimitError, match="rate limit"):
+        with pytest.raises(exc_type, match=match):
             backend.search("test")
 
     def test_generic_error_raises_network_error(
@@ -193,7 +192,6 @@ class TestTavilySearch:
     ) -> None:
         backend, client = backend_and_client
         client._raise = RuntimeError("connection failed")
-
         with pytest.raises(SearchNetworkError, match="request failed"):
             backend.search("test")
 
@@ -229,17 +227,17 @@ class TestTavilySearch:
 
 
 class TestTavilyCostExtraction:
-    def test_extract_cost_with_usage(self) -> None:
-        assert TavilySearchBackend._extract_cost({"usage": {"credits": 2}}) == 2.0
-
-    def test_extract_cost_missing_usage(self) -> None:
-        assert TavilySearchBackend._extract_cost({}) == 0.0
-
-    def test_extract_cost_invalid_credits(self) -> None:
-        assert TavilySearchBackend._extract_cost({"usage": {"credits": "bad"}}) == 0.0
-
-    def test_extract_cost_non_dict_usage(self) -> None:
-        assert TavilySearchBackend._extract_cost({"usage": "invalid"}) == 0.0
+    @pytest.mark.parametrize(
+        "response,expected",
+        [
+            ({"usage": {"credits": 2}}, 2.0),
+            ({}, 0.0),
+            ({"usage": {"credits": "bad"}}, 0.0),
+            ({"usage": "invalid"}, 0.0),
+        ],
+    )
+    def test_extract_cost(self, response: dict, expected: float) -> None:
+        assert TavilySearchBackend._extract_cost(response) == expected
 
 
 # --- Date conversion ---
