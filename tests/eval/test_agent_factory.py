@@ -1,4 +1,5 @@
 """Tests for miniprophet.eval.agent_factory module."""
+
 from __future__ import annotations
 
 import pytest
@@ -22,6 +23,7 @@ class TestImportAgentClass:
     def test_valid_import_succeeds(self) -> None:
         cls = EvalAgentFactory._import_agent_class("miniprophet.exceptions:SearchError")
         from miniprophet.exceptions import SearchError
+
         assert cls is SearchError
 
 
@@ -42,6 +44,7 @@ class TestResolveAgentClass:
             agent_class=None,
         )
         from miniprophet.exceptions import SearchError
+
         assert result is SearchError
 
     def test_default_agent_resolved(self) -> None:
@@ -49,6 +52,7 @@ class TestResolveAgentClass:
             agent_name="default", agent_import_path=None, agent_class=None
         )
         from miniprophet.agent.default import DefaultForecastAgent
+
         assert result is DefaultForecastAgent
 
     def test_unknown_agent_name_raises(self) -> None:

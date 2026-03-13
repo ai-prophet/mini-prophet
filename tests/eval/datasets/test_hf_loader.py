@@ -1,12 +1,12 @@
 """Tests for miniprophet.eval.datasets.hf_loader module."""
+
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import pytest
 
-from miniprophet.eval.datasets.hf_loader import parse_hf_ref, download_hf_dataset
+from miniprophet.eval.datasets.hf_loader import download_hf_dataset, parse_hf_ref
 
 
 class TestParseHfRef:
@@ -61,6 +61,7 @@ class TestDownloadHfDataset:
         )
         # Make sure the 'datasets' import fails
         import builtins
+
         original_import = builtins.__import__
 
         def mock_import(name, *args, **kwargs):

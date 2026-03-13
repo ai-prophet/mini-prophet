@@ -271,6 +271,7 @@ class TestRunAgentWithTimeout:
                 return {"exit_status": "done"}
 
         import threading
+
         result = _run_agent_with_timeout(
             agent=Agent(),
             timeout_seconds=0,
@@ -311,10 +312,18 @@ def test_batch_forecast_with_prebuilt_model(mock_get_search: MagicMock) -> None:
     class FakeModel:
         class config:
             model_name = "fake"
-        def query(self, *a, **kw): return {}
-        def format_message(self, **kw): return kw
-        def format_observation_messages(self, msg, out): return []
-        def serialize(self): return {"info": {"config": {"model": {}}}}
+
+        def query(self, *a, **kw):
+            return {}
+
+        def format_message(self, **kw):
+            return kw
+
+        def format_observation_messages(self, msg, out):
+            return []
+
+        def serialize(self):
+            return {"info": {"config": {"model": {}}}}
 
     problems = _make_problems(1)
     results = batch_forecast(

@@ -73,8 +73,12 @@ class TestBraveGetLinks:
         ],
     )
     def test_http_error_raises_expected(
-        self, backend: BraveSearchBackend, monkeypatch: pytest.MonkeyPatch,
-        status_code: int, exc_type: type, match: str,
+        self,
+        backend: BraveSearchBackend,
+        monkeypatch: pytest.MonkeyPatch,
+        status_code: int,
+        exc_type: type,
+        match: str,
     ) -> None:
         resp = _mock_response(status_code, text="Internal Server Error")
         monkeypatch.setattr("miniprophet.tools.search.brave.requests.get", lambda *a, **kw: resp)
@@ -86,7 +90,9 @@ class TestBraveGetLinks:
     ) -> None:
         monkeypatch.setattr(
             "miniprophet.tools.search.brave.requests.get",
-            lambda *a, **kw: (_ for _ in ()).throw(requests.exceptions.ConnectionError("connection refused")),
+            lambda *a, **kw: (_ for _ in ()).throw(
+                requests.exceptions.ConnectionError("connection refused")
+            ),
         )
         with pytest.raises(SearchNetworkError, match="request failed"):
             backend._get_links("test", 5)

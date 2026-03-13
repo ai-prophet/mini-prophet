@@ -48,7 +48,9 @@ def test_add_source_tool_rejects_missing_source_id() -> None:
 
 
 def test_add_source_tool_rejects_missing_note(dummy_source: Source) -> None:
-    tool = AddSourceTool(source_registry={"S1": dummy_source}, board=SourceBoard(), outcomes=["Yes", "No"])
+    tool = AddSourceTool(
+        source_registry={"S1": dummy_source}, board=SourceBoard(), outcomes=["Yes", "No"]
+    )
     output = tool.execute({"source_id": "S1", "note": ""})
     assert output["error"] is True
     assert "'note' is required" in output["output"]
@@ -74,7 +76,9 @@ def test_add_source_tool_rejects_bad_sentiment(dummy_source: Source) -> None:
     tool = AddSourceTool(
         source_registry={"S1": dummy_source}, board=SourceBoard(), outcomes=["Yes", "No"]
     )
-    output = tool.execute({"source_id": "S1", "note": "ok", "reaction": {"Yes": "invalid_sentiment"}})
+    output = tool.execute(
+        {"source_id": "S1", "note": "ok", "reaction": {"Yes": "invalid_sentiment"}}
+    )
     assert output["error"] is True
     assert "Invalid sentiment" in output["output"]
 

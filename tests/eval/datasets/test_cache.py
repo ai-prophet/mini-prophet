@@ -1,7 +1,6 @@
 """Tests for miniprophet.eval.datasets.cache module."""
-from __future__ import annotations
 
-from pathlib import Path
+from __future__ import annotations
 
 from miniprophet.eval.datasets.cache import (
     get_dataset_cache_root,

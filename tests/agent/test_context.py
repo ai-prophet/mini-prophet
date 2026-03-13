@@ -73,7 +73,9 @@ def test_get_context_manager_none_key() -> None:
 
 
 def test_get_context_manager_sliding_window() -> None:
-    mgr = get_context_manager({"context_manager_class": "sliding_window", "sliding_window": {"window_size": 3}})
+    mgr = get_context_manager(
+        {"context_manager_class": "sliding_window", "sliding_window": {"window_size": 3}}
+    )
     assert isinstance(mgr, SlidingWindowContextManager)
     assert mgr.window_size == 3
 

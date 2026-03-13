@@ -174,8 +174,11 @@ class TestTavilySearch:
         ],
     )
     def test_http_error_raises_expected(
-        self, backend_and_client: tuple[TavilySearchBackend, _FakeTavilyClient],
-        status_code: int, exc_type: type, match: str,
+        self,
+        backend_and_client: tuple[TavilySearchBackend, _FakeTavilyClient],
+        status_code: int,
+        exc_type: type,
+        match: str,
     ) -> None:
         backend, client = backend_and_client
         exc = Exception("error")

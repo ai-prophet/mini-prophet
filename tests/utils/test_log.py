@@ -1,4 +1,5 @@
 """Tests for miniprophet.utils.log module."""
+
 from __future__ import annotations
 
 import logging
@@ -42,6 +43,8 @@ def test_add_file_handler_prints_path(tmp_path: Path, capsys) -> None:
     # Clean up
     logger = logging.getLogger("miniprophet")
     for h in list(logger.handlers):
-        if isinstance(h, logging.FileHandler) and str(log_file) in str(getattr(h, "baseFilename", "")):
+        if isinstance(h, logging.FileHandler) and str(log_file) in str(
+            getattr(h, "baseFilename", "")
+        ):
             logger.removeHandler(h)
             h.close()

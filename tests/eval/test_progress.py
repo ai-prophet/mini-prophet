@@ -1,4 +1,5 @@
 """Tests for miniprophet.eval.progress module."""
+
 from __future__ import annotations
 
 from miniprophet.eval.progress import EvalProgressManager, _shorten

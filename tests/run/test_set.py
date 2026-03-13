@@ -1,4 +1,5 @@
 """Tests for miniprophet.run.set CLI command."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -14,8 +15,10 @@ def test_set_key_value_saves_new(monkeypatch, tmp_path: Path) -> None:
     env_file = tmp_path / ".env"
     monkeypatch.setattr("miniprophet.run.set.global_config_file", env_file)
 
-    with patch("miniprophet.run.set.save_env_var") as mock_save, \
-         patch("miniprophet.run.set.read_env_vars", return_value={}):
+    with (
+        patch("miniprophet.run.set.save_env_var") as mock_save,
+        patch("miniprophet.run.set.read_env_vars", return_value={}),
+    ):
         main(key="MY_KEY", value="my_value", interactive=False)
         mock_save.assert_called_once_with(env_file, "MY_KEY", "my_value")
 
@@ -24,8 +27,10 @@ def test_set_key_value_updates_existing(monkeypatch, tmp_path: Path) -> None:
     env_file = tmp_path / ".env"
     monkeypatch.setattr("miniprophet.run.set.global_config_file", env_file)
 
-    with patch("miniprophet.run.set.save_env_var"), \
-         patch("miniprophet.run.set.read_env_vars", return_value={"MY_KEY": "old"}):
+    with (
+        patch("miniprophet.run.set.save_env_var"),
+        patch("miniprophet.run.set.read_env_vars", return_value={"MY_KEY": "old"}),
+    ):
         main(key="MY_KEY", value="new_value", interactive=False)
 
 

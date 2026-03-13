@@ -72,7 +72,9 @@ def test_search_tool_get_schema_without_backend_params() -> None:
     class NoSchemaBackend:
         def search(self, query, limit=5, **kw):
             from miniprophet.tools.search import SearchResult
+
             return SearchResult(sources=[], cost=0.0)
+
         def serialize(self):
             return {}
 

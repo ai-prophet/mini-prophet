@@ -84,9 +84,9 @@ class SearchForecastTool:
         """Return all discovered sources keyed by stable source_id (S1, S2, ...)."""
         items = sorted(
             self._source_registry.items(),
-            key=lambda kv: int(kv[0][1:])
-            if kv[0].startswith("S") and kv[0][1:].isdigit()
-            else 10**9,
+            key=lambda kv: (
+                int(kv[0][1:]) if kv[0].startswith("S") and kv[0][1:].isdigit() else 10**9
+            ),
         )
         return {
             sid: {
