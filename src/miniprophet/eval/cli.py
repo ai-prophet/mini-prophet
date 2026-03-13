@@ -10,7 +10,7 @@ from typing import Any
 import typer
 
 from miniprophet import __version__
-from miniprophet.cli.components.banner import print_cli_banner
+from miniprophet.cli.components.banner import print_cli_banner, print_run_info
 from miniprophet.cli.utils import get_console
 from miniprophet.eval.datasets.loader import DatasetSourceKind, resolve_dataset_to_jsonl
 from miniprophet.eval.datasets.validate import load_problems
@@ -283,6 +283,15 @@ def main(
     console.print(f"  Workers: [cyan]{workers}[/cyan]  Output: [cyan]{out_dir}[/cyan]\n")
 
     config = _build_eval_config(config_spec, max_cost_per_run, model_name, model_class)
+
+    model_cfg = config.get("model", {})
+    search_cfg_top = config.get("search", {})
+    print_run_info(
+        model_class=model_cfg.get("model_class", "litellm"),
+        model_name=model_cfg.get("model_name", ""),
+        search_class=search_cfg_top.get("search_class", "perplexity"),
+    )
+
     problems, resume_results, resume_total_cost = _resolve_resume_state(
         enabled=resume, output=out_dir, problems=problems
     )
