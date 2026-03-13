@@ -61,6 +61,9 @@ def main(
     disable_history: bool = typer.Option(
         False, "--disable-history", help="Skip writing to forecast history."
     ),
+    disable_interrupt: bool = typer.Option(
+        False, "--disable-interrupt", help="Disable Ctrl+C pause-and-inject during agent run."
+    ),
 ) -> None:
     """Run the forecasting agent on a question with specified outcomes."""
     from miniprophet.agent.cli_agent import CliForecastAgent
@@ -114,6 +117,7 @@ def main(
                 "search_limit": search_limit or UNSET,
                 "step_limit": step_limit or UNSET,
                 "output_path": str(output) if output else UNSET,
+                "enable_interrupt": False if disable_interrupt else UNSET,
             },
             "model": {
                 "model_name": model_name or UNSET,

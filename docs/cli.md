@@ -33,6 +33,7 @@ prophet run --title "..." --outcomes "Yes,No"
 | `--config` | `-c` | Config file(s) or `key=value` overrides |
 | `--output` |  | Output directory (`info.json`, `trajectory.json`, `sources.json`) |
 | `--disable-history` |  | Skip writing to forecast history |
+| `--disable-interrupt` |  | Disable Ctrl+C pause-and-inject during agent run |
 
 ## Examples
 
@@ -98,6 +99,16 @@ Interactive mode supports:
 - Kalshi ticker import (auto-detect event/market)
 - Polymarket identifier import (auto-detect event/market)
 - browsing and rerunning from historical forecasts
+
+## Interrupt mode (human-in-the-loop)
+
+By default, pressing `Ctrl+C` during an agent run pauses the agent after the current operation (LLM call or tool execution) completes. You can then type a message to inject into the conversation (e.g., guidance, corrections) and the agent resumes with your input in context.
+
+- First `Ctrl+C`: pauses after current operation finishes
+- Type a message and press Enter to inject it, or press Enter with no input to resume silently
+- Second `Ctrl+C` (double-tap): hard abort
+
+Disable with `--disable-interrupt` or `agent.enable_interrupt=false` in config.
 
 ## Exit/output behavior
 

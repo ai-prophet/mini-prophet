@@ -188,8 +188,8 @@ class DefaultForecastAgent:
         self.on_run_end(result)
         return result
 
-    def step(self) -> list[dict]:
-        # Strip stale board state before context management
+    def _prepare_messages_for_step(self) -> None:
+        """Strip stale board state, apply context manager, inject fresh board state."""
         self.messages = [m for m in self.messages if not m.get("extra", {}).get("is_board_state")]
 
         if self.context_manager is not None:
@@ -206,6 +206,8 @@ class DefaultForecastAgent:
                 },
             )
 
+    def step(self) -> list[dict]:
+        self._prepare_messages_for_step()
         return self.execute_actions(self.query())
 
     def query(self) -> dict:
