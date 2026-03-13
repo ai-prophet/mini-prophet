@@ -6,18 +6,9 @@ import json
 
 from rich.panel import Panel
 
-from miniprophet.cli.utils import get_console
+from miniprophet.cli.utils import format_token_summary, get_console
 
 console = get_console()
-
-
-def _format_token_count(n: int) -> str:
-    """Format large token counts with k/M suffix for readability."""
-    if n >= 1_000_000:
-        return f"{n / 1_000_000:.1f}M"
-    if n >= 1_000:
-        return f"{n / 1_000:.1f}k"
-    return str(n)
 
 
 def print_step_header(
@@ -34,15 +25,7 @@ def print_step_header(
     parts = [f"[bold]Step {step}[/bold]  |  {cost_str}"]
 
     if prompt_tokens > 0:
-        ctx_used = _format_token_count(prompt_tokens)
-        if max_context_tokens:
-            ctx_max = _format_token_count(max_context_tokens)
-            pct = prompt_tokens / max_context_tokens * 100
-            parts.append(f"context={ctx_used}/{ctx_max} ({pct:.0f}%)")
-        else:
-            parts.append(f"context={ctx_used}")
-        if completion_tokens > 0:
-            parts.append(f"completion={_format_token_count(completion_tokens)}")
+        parts.append(format_token_summary(prompt_tokens, completion_tokens, max_context_tokens))
 
     console.rule("  ".join(parts), style="cyan")
 

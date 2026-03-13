@@ -103,16 +103,7 @@ class DefaultForecastAgent:
     def on_run_start(self, title: str, outcomes: str, config: AgentConfig) -> None:
         pass
 
-    def on_step_start(
-        self,
-        step: int,
-        model_cost: float,
-        search_cost: float,
-        total_cost: float,
-        prompt_tokens: int = 0,
-        completion_tokens: int = 0,
-        max_context_tokens: int | None = None,
-    ) -> None:
+    def on_step_start(self) -> None:
         pass
 
     def on_model_response(self, message: dict) -> None:
@@ -264,15 +255,7 @@ class DefaultForecastAgent:
         self.add_messages(message)
         self._trajectory.record_step(input_snapshot, message)
 
-        self.on_step_start(
-            self.n_calls,
-            self.model_cost,
-            self.search_cost,
-            self.total_cost,
-            self.prompt_tokens,
-            self.completion_tokens,
-            self.max_context_tokens,
-        )
+        self.on_step_start()
         self.on_model_response(message)
         return message
 

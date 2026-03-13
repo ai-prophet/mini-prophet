@@ -121,9 +121,7 @@ class LitellmModel:
             info = litellm.get_model_info(self.config.model_name)
             return info.get("max_input_tokens")
         except Exception:
-            self.logger.debug(
-                f"Could not retrieve max context tokens for {self.config.model_name}"
-            )
+            self.logger.debug(f"Could not retrieve max context tokens for {self.config.model_name}")
             return None
 
     def _build_message(self, response) -> dict:
