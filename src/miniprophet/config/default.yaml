@@ -39,7 +39,7 @@ agent:
   max_outcomes: 20
   context_window: 10
   show_current_time: false
-  enable_grace_period: false
+  enable_grace_period: true
   grace_period_extra_turns: 3
   grace_period_prompt: |
     You have reached the step limit. You MUST now submit your forecast
