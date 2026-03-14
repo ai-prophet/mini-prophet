@@ -40,7 +40,13 @@ class RateLimitCoordinator:
 
 
 class EvalBatchAgentWrapper:
-    """Wrap arbitrary agents so they can run in eval worker orchestration."""
+    """Wrap arbitrary agents so they can run in eval worker orchestration.
+
+    Timeout cancellation is handled by ``DefaultForecastAgent`` directly
+    via the ``cancel_event`` parameter (passed through by
+    ``EvalAgentFactory``).  This wrapper handles pre-run guards
+    (rate-limit coordination) and cost tracking.
+    """
 
     def __init__(
         self,
@@ -56,7 +62,6 @@ class EvalBatchAgentWrapper:
         self._coordinator = coordinator
         self._progress = progress_manager
         self._cancel_event = cancel_event
-        self._prev_cost = 0.0
 
     @property
     def model_cost(self) -> float:
@@ -76,52 +81,15 @@ class EvalBatchAgentWrapper:
                 pass
         return self.model_cost + self.search_cost
 
-    def _check_cancelled(self) -> None:
+    def _pre_run_guard(self) -> None:
+        """Check cancel event and wait for rate-limit coordinator before starting."""
         if self._cancel_event is not None and self._cancel_event.is_set():
             raise BatchRunTimeoutError("Eval run timed out and was cancelled.")
-
-    def _pre_step_guard(self) -> None:
-        self._check_cancelled()
 
         if self._coordinator is not None:
             resumed = self._coordinator.wait_if_paused(cancel_event=self._cancel_event)
             if not resumed:
                 raise BatchRunTimeoutError("Eval run timed out and was cancelled.")
-
-    def _patch_step(self) -> tuple[Any | None, Any | None]:
-        original_step = getattr(self._agent, "step", None)
-        if original_step is None or not callable(original_step):
-            return None, None
-
-        def _wrapped_step(*args, **kwargs):
-            self._pre_step_guard()
-            res = original_step(*args, **kwargs)
-            self._pre_step_guard()
-            if self._progress is not None:
-                cost_delta = self.total_cost - self._prev_cost
-                self._prev_cost = self.total_cost
-                step_idx = int(getattr(self._agent, "n_calls", 0) or 0) + 1
-                cost_limit = getattr(getattr(self._agent, "config", None), "cost_limit", None)
-                if cost_limit is not None:
-                    msg = f"Step {step_idx} (${self.total_cost:.2f}/${cost_limit:.2f})"
-                else:
-                    msg = f"Step {step_idx} (${self.total_cost:.2f})"
-                self._progress.update_run_status(
-                    self.task_id,
-                    msg,
-                    cost_delta=cost_delta,
-                )
-            return res
-
-        setattr(self._agent, "step", _wrapped_step)
-        return original_step, _wrapped_step
-
-    def _restore_step(self, original_step: Any | None, wrapped_step: Any | None) -> None:
-        if original_step is None or wrapped_step is None:
-            return
-        current = getattr(self._agent, "step", None)
-        if current is wrapped_step:
-            setattr(self._agent, "step", original_step)
 
     def run(
         self,
@@ -131,17 +99,13 @@ class EvalBatchAgentWrapper:
         ground_truth: dict[str, int] | None = None,
         **runtime_kwargs,
     ) -> Any:
-        self._pre_step_guard()
-        original_step, wrapped_step = self._patch_step()
-        try:
-            return self._agent.run(
-                title=title,
-                outcomes=outcomes,
-                ground_truth=ground_truth,
-                **runtime_kwargs,
-            )
-        finally:
-            self._restore_step(original_step, wrapped_step)
+        self._pre_run_guard()
+        return self._agent.run(
+            title=title,
+            outcomes=outcomes,
+            ground_truth=ground_truth,
+            **runtime_kwargs,
+        )
 
     def save(self, path, *extra_dicts):
         save = getattr(self._agent, "save", None)
