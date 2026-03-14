@@ -2,17 +2,38 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import threading
 from typing import Any
-
-from miniprophet.exceptions import BatchRunTimeoutError
 
 logger = logging.getLogger("miniprophet.agent.eval")
 
 
 class RateLimitCoordinator:
-    """Shared pause/resume gate for all eval workers."""
+    """Shared pause/resume gate for all eval workers (asyncio-based)."""
+
+    def __init__(self, backoff_seconds: float = 60) -> None:
+        self._resume = asyncio.Event()
+        self._resume.set()
+        self._lock = asyncio.Lock()
+        self._backoff = backoff_seconds
+
+    async def wait_if_paused(self) -> None:
+        await self._resume.wait()
+
+    async def signal_rate_limit(self, backoff_seconds: float | None = None) -> None:
+        secs = backoff_seconds if backoff_seconds is not None else self._backoff
+        async with self._lock:
+            if self._resume.is_set():
+                logger.warning("Rate limit detected -- pausing all workers for %.0fs", secs)
+                self._resume.clear()
+                asyncio.get_running_loop().call_later(secs, self._resume.set)
+
+
+# Keep the threading-based coordinator for backward compat with sync code paths
+class ThreadedRateLimitCoordinator:
+    """Shared pause/resume gate for all eval workers (threading-based, legacy)."""
 
     def __init__(self, backoff_seconds: float = 60) -> None:
         self._resume = threading.Event()
@@ -55,7 +76,6 @@ class EvalBatchAgentWrapper:
         task_id: str,
         coordinator: RateLimitCoordinator | None = None,
         progress_manager: Any | None = None,
-        cancel_event: threading.Event | None = None,
     ) -> None:
         self._agent = agent
         self.task_id = task_id
@@ -87,9 +107,7 @@ class EvalBatchAgentWrapper:
             raise BatchRunTimeoutError("Eval run timed out and was cancelled.")
 
         if self._coordinator is not None:
-            resumed = self._coordinator.wait_if_paused(cancel_event=self._cancel_event)
-            if not resumed:
-                raise BatchRunTimeoutError("Eval run timed out and was cancelled.")
+            await self._coordinator.wait_if_paused()
 
     def run(
         self,

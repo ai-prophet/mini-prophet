@@ -12,7 +12,7 @@ import requests
 from pydantic import BaseModel
 
 from miniprophet.models import GLOBAL_MODEL_STATS
-from miniprophet.models.retry import retry
+from miniprophet.models.retry import async_retry, retry
 from miniprophet.models.utils import (
     format_observation_messages,
     parse_single_action,
@@ -106,6 +106,67 @@ class OpenRouterModel:
                 raise OpenRouterRateLimitError("Rate limit exceeded")
             raise OpenRouterAPIError(f"HTTP {resp.status_code}: {resp.text[:300]}")
         except requests.exceptions.RequestException as exc:
+            raise OpenRouterAPIError(f"Request failed: {exc}") from exc
+
+    # ------------------------------------------------------------------
+    # Async core query
+    # ------------------------------------------------------------------
+
+    async def aquery(self, messages: list[dict], tools: list[dict]) -> dict:
+        prepared = [{k: v for k, v in msg.items() if k != "extra"} for msg in messages]
+        async for attempt in async_retry(logger=logger, abort_exceptions=self.abort_exceptions):
+            with attempt:
+                response = await self._aquery(prepared, tools)
+
+        cost_info = self._calculate_cost(response)
+        GLOBAL_MODEL_STATS.add(cost_info["cost"])
+        usage_info = self._extract_usage(response)
+
+        message = dict(response["choices"][0]["message"])
+        message["extra"] = {
+            "actions": self._parse_actions(response),
+            "response": response,
+            **cost_info,
+            **usage_info,
+            "timestamp": time.time(),
+        }
+        return message
+
+    async def _aquery(self, messages: list[dict], tools: list[dict]) -> dict:
+        import httpx
+
+        headers = {
+            "Authorization": f"Bearer {self._api_key}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "model": self.config.model_name,
+            "messages": messages,
+            "tools": tools,
+            "usage": {"include": True},
+            **self.config.model_kwargs,
+        }
+
+        try:
+            async with httpx.AsyncClient() as client:
+                resp = await client.post(
+                    self._api_url,
+                    headers=headers,
+                    json=payload,
+                    timeout=120,
+                )
+                resp.raise_for_status()
+                return resp.json()
+        except httpx.HTTPStatusError as exc:
+            status_code = exc.response.status_code
+            if status_code == 401:
+                raise OpenRouterAuthenticationError(
+                    "Authentication failed. Check OPENROUTER_API_KEY."
+                )
+            if status_code == 429:
+                raise OpenRouterRateLimitError("Rate limit exceeded")
+            raise OpenRouterAPIError(f"HTTP {status_code}: {exc.response.text[:300]}")
+        except httpx.RequestError as exc:
             raise OpenRouterAPIError(f"Request failed: {exc}") from exc
 
     # ------------------------------------------------------------------

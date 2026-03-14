@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
-import threading
 from dataclasses import dataclass, field
 from pathlib import Path
-from queue import Empty, Queue
 from typing import Any
 
 from miniprophet.eval.agent_factory import EvalAgentFactory
@@ -16,13 +15,11 @@ from miniprophet.eval.batch import (
     MAX_RETRIES,
     _is_auth_error,
     _is_rate_limit_error,
-    _run_agent_with_timeout,
 )
 from miniprophet.eval.progress import EvalProgressManager
 from miniprophet.eval.types import ForecastProblem
 from miniprophet.exceptions import (
     BatchFatalError,
-    BatchRunTimeoutError,
     SearchAuthError,
 )
 
@@ -100,11 +97,11 @@ class EvalRunState:
 
     coordinator: RateLimitCoordinator
     progress: EvalProgressManager
-    summary_lock: threading.Lock
+    summary_lock: asyncio.Lock
     summary_path: Path
     results: dict[str, RunResult]
     total_cost_ref: list[float]
-    fatal_event: threading.Event
+    fatal_event: asyncio.Event
     model: Any
     search_backend: Any
     fatal_error: str | None = None
@@ -146,12 +143,11 @@ def _write_summary(args: EvalRunArgs, state: EvalRunState) -> None:
         "total_cost": state.total_cost_ref[0],
         "runs": [r.to_dict() for r in state.results.values()],
     }
-    with state.summary_lock:
-        state.summary_path.parent.mkdir(parents=True, exist_ok=True)
-        state.summary_path.write_text(json.dumps(summary, indent=2))
+    state.summary_path.parent.mkdir(parents=True, exist_ok=True)
+    state.summary_path.write_text(json.dumps(summary, indent=2))
 
 
-def process_problem(
+async def aprocess_problem(
     problem: ForecastProblem,
     args: EvalRunArgs,
     state: EvalRunState,
@@ -170,7 +166,6 @@ def process_problem(
 
     agent: Any = None
     timed_out = False
-    cancel_event = threading.Event()
 
     try:
         if args.max_cost > 0 and state.total_cost_ref[0] >= args.max_cost:
@@ -210,7 +205,6 @@ def process_problem(
             task_id=task_id,
             coordinator=state.coordinator,
             progress_manager=state.progress,
-            cancel_event=cancel_event,
         )
 
         runtime_kwargs = {
@@ -218,14 +212,14 @@ def process_problem(
             "search_date_after": args.search_date_after,
         }
 
-        forecast = _run_agent_with_timeout(
-            agent=agent,
-            timeout_seconds=args.timeout_seconds,
-            cancel_event=cancel_event,
-            title=problem.title,
-            outcomes=problem.outcomes,
-            ground_truth=problem.ground_truth,
-            runtime_kwargs=runtime_kwargs,
+        forecast = await asyncio.wait_for(
+            agent.arun(
+                title=problem.title,
+                outcomes=problem.outcomes,
+                ground_truth=problem.ground_truth,
+                **runtime_kwargs,
+            ),
+            timeout=args.timeout_seconds if args.timeout_seconds > 0 else None,
         )
 
         result.status = forecast.get("exit_status", "unknown")
@@ -237,7 +231,7 @@ def process_problem(
             "total": float(getattr(agent, "total_cost", 0.0) or 0.0),
         }
 
-        with state.summary_lock:
+        async with state.summary_lock:
             state.total_cost_ref[0] += result.cost["total"]
 
         state.progress.on_run_end(task_id, result.status)
@@ -249,16 +243,16 @@ def process_problem(
         state.progress.on_run_end(task_id, result.status)
         raise BatchFatalError(f"Run {task_id} failed with auth error: {exc}") from exc
 
-    except BatchRunTimeoutError as exc:
+    except TimeoutError:
         timed_out = True
-        result.status = type(exc).__name__
-        result.error = str(exc)
+        result.status = "BatchRunTimeoutError"
+        result.error = f"Run timed out after {args.timeout_seconds:.1f}s"
         state.progress.on_run_end(task_id, result.status)
         return True
 
     except Exception as exc:
         if _is_rate_limit_error(exc):
-            state.coordinator.signal_rate_limit()
+            await state.coordinator.signal_rate_limit()
             if problem.retries < MAX_RETRIES:
                 problem.retries += 1
                 logger.warning(
@@ -291,13 +285,11 @@ def process_problem(
         _write_summary(args, state)
 
 
-def run_eval(
+async def arun_eval(
     problems: list[ForecastProblem],
     args: EvalRunArgs,
 ) -> dict[str, RunResult]:
-    """Execute eval with parallel workers."""
-    import concurrent.futures
-
+    """Execute eval with async parallel workers."""
     from rich.live import Live
 
     from miniprophet.models import get_model
@@ -309,80 +301,55 @@ def run_eval(
     state = EvalRunState(
         coordinator=RateLimitCoordinator(),
         progress=EvalProgressManager(len(problems)),
-        summary_lock=threading.Lock(),
+        summary_lock=asyncio.Lock(),
         summary_path=args.output_dir / "summary.json",
         results=dict(args.initial_results or {}),
         total_cost_ref=[float(args.initial_total_cost)],
-        fatal_event=threading.Event(),
+        fatal_event=asyncio.Event(),
         model=model,
         search_backend=search_backend,
     )
 
-    queue: Queue[ForecastProblem] = Queue()
-    for p in problems:
-        queue.put(p)
+    semaphore = asyncio.Semaphore(args.workers)
 
-    def _drain_pending_queue() -> int:
-        drained = 0
-        while True:
-            try:
-                queue.get_nowait()
-            except Empty:
-                break
-            else:
-                queue.task_done()
-                drained += 1
-        return drained
-
-    def worker_loop() -> None:
-        while True:
-            if state.fatal_event.is_set():
-                return
-
-            try:
-                problem = queue.get(timeout=0.5)
-            except Empty:
-                if queue.empty() or state.fatal_event.is_set():
-                    return
-                continue
-
-            try:
+    async def run_one(problem: ForecastProblem) -> None:
+        async with semaphore:
+            for _attempt in range(MAX_RETRIES + 1):
                 if state.fatal_event.is_set():
                     return
+                try:
+                    done = await aprocess_problem(problem, args, state)
+                    if done:
+                        return
+                except BatchFatalError as exc:
+                    state.fatal_error = str(exc)
+                    state.fatal_event.set()
+                    return
+                except Exception as exc:
+                    result = state.results.setdefault(
+                        problem.task_id,
+                        RunResult(task_id=problem.task_id, title=problem.title),
+                    )
+                    result.status = type(exc).__name__
+                    result.error = str(exc)
+                    logger.error(
+                        "Unhandled worker exception for %s",
+                        problem.task_id,
+                        exc_info=True,
+                    )
+                    state.progress.on_run_end(problem.task_id, result.status)
+                    _write_summary(args, state)
+                    return
 
-                done = process_problem(problem, args, state)
-                if not done and not state.fatal_event.is_set():
-                    queue.put(problem)
-            except BatchFatalError as exc:
-                state.fatal_error = str(exc)
-                state.fatal_event.set()
-                _drain_pending_queue()
-                return
-            except Exception as exc:
-                result = state.results.setdefault(
-                    problem.task_id,
-                    RunResult(task_id=problem.task_id, title=problem.title),
-                )
-                result.status = type(exc).__name__
-                result.error = str(exc)
-                logger.error("Unhandled worker exception for %s", problem.task_id, exc_info=True)
-                state.progress.on_run_end(problem.task_id, result.status)
-                _write_summary(args, state)
-            finally:
-                queue.task_done()
+    tasks = [asyncio.create_task(run_one(p)) for p in problems]
 
     with Live(state.progress.render_group, refresh_per_second=4):
-        with concurrent.futures.ThreadPoolExecutor(max_workers=args.workers) as executor:
-            futures = [executor.submit(worker_loop) for _ in range(args.workers)]
-            try:
-                queue.join()
-            except KeyboardInterrupt:
-                logger.info("Eval interrupted by user. Waiting for active runs to finish...")
-            for f in futures:
-                try:
-                    f.result(timeout=1)
-                except Exception:
-                    pass
+        try:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        except KeyboardInterrupt:
+            logger.info("Eval interrupted by user. Cancelling active runs...")
+            for t in tasks:
+                t.cancel()
 
     _write_summary(args, state)
 
@@ -390,3 +357,11 @@ def run_eval(
         raise BatchFatalError(state.fatal_error or "Eval terminated due to a fatal error.")
 
     return state.results
+
+
+def run_eval(
+    problems: list[ForecastProblem],
+    args: EvalRunArgs,
+) -> dict[str, RunResult]:
+    """Execute eval with parallel workers. Sync wrapper."""
+    return asyncio.run(arun_eval(problems, args))

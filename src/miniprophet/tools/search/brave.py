@@ -6,6 +6,7 @@ in snippets/brave_search.py.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from typing import Any
@@ -80,6 +81,9 @@ class BraveSearchBackend:
                 )
         logger.info(f"Search '{query}': {len(sources)}/{len(links)} sources extracted")
         return SearchResult(sources=sources, cost=0.0)
+
+    async def asearch(self, query: str, limit: int = 5, **kwargs: Any) -> SearchResult:
+        return await asyncio.to_thread(self.search, query, limit, **kwargs)
 
     def _get_links(
         self, query: str, limit: int, freshness: Any | None = None

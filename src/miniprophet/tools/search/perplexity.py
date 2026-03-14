@@ -75,6 +75,7 @@ class PerplexitySearchBackend:
         self._max_tokens = max_tokens
         self._country = country
         self._client = Perplexity(api_key=self._api_key, timeout=float(self._timeout))
+        self._async_client = None
 
     def search(self, query: str, limit: int = 5, **kwargs: Any) -> SearchResult:
         payload: dict[str, Any] = {
@@ -129,6 +130,65 @@ class PerplexitySearchBackend:
 
         logger.info(f"Perplexity search '{query}': {len(sources)} source(s)")
         # For perplexity, the cost is fixed for each request, regardless of the number of sources returned
+        return SearchResult(sources=sources, cost=PERPLEXITY_PER_SEARCH_COST)
+
+    async def asearch(self, query: str, limit: int = 5, **kwargs: Any) -> SearchResult:
+        if self._async_client is None:
+            from perplexity import AsyncPerplexity
+
+            self._async_client = AsyncPerplexity(
+                api_key=self._api_key, timeout=float(self._timeout)
+            )
+
+        payload: dict[str, Any] = {
+            "query": query,
+            "max_results": min(limit, 20),
+            "max_tokens_per_page": self._max_tokens_per_page,
+            "max_tokens": self._max_tokens,
+        }
+        if self._country:
+            payload["country"] = self._country
+
+        search_date_before = kwargs.pop("search_date_before", None)
+        search_date_after = kwargs.pop("search_date_after", None)
+        payload.update(kwargs)
+        if search_date_after:
+            payload["search_after_date_filter"] = search_date_after
+            payload["last_updated_after_filter"] = search_date_after
+        if search_date_before:
+            payload["search_before_date_filter"] = search_date_before
+            payload["last_updated_before_filter"] = search_date_before
+
+        try:
+            resp = await self._async_client.search.create(**payload)
+        except Exception as exc:
+            status_code = getattr(exc, "status_code", None)
+            if status_code is None:
+                status_code = getattr(getattr(exc, "response", None), "status_code", None)
+
+            if status_code == 401:
+                raise SearchAuthError(
+                    "Perplexity API authentication failed. Check PERPLEXITY_API_KEY."
+                )
+            if status_code == 429:
+                raise SearchRateLimitError("Perplexity API rate limit exceeded")
+            raise SearchNetworkError(f"Perplexity SDK request failed: {exc}") from exc
+
+        sources: list[Source] = []
+        for item in resp.results:
+            url = item.url or ""
+            snippet = item.snippet or ""
+            title = item.title or ""
+            date, updated_date = item.date, item.last_updated
+            if date is not None and updated_date is not None:
+                d1, d2 = (
+                    datetime.strptime(date, "%Y-%m-%d"),
+                    datetime.strptime(updated_date, "%Y-%m-%d"),
+                )
+                date = max(d1, d2).strftime("%Y-%m-%d")
+            sources.append(Source(url=url, title=title, snippet=snippet, date=date))
+
+        logger.info(f"Perplexity async search '{query}': {len(sources)} source(s)")
         return SearchResult(sources=sources, cost=PERPLEXITY_PER_SEARCH_COST)
 
     def serialize(self) -> dict:

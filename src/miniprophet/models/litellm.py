@@ -11,7 +11,7 @@ import litellm
 from pydantic import BaseModel
 
 from miniprophet.models import GLOBAL_MODEL_STATS
-from miniprophet.models.retry import retry
+from miniprophet.models.retry import async_retry, retry
 from miniprophet.models.utils import (
     format_observation_messages,
     parse_single_action,
@@ -71,6 +71,41 @@ class LitellmModel:
 
     def _query(self, messages: list[dict], tools: list[dict]):
         return litellm.completion(
+            model=self.config.model_name,
+            messages=messages,
+            tools=tools,
+            **self.config.model_kwargs,
+        )
+
+    # ------------------------------------------------------------------
+    # Async core query
+    # ------------------------------------------------------------------
+
+    async def aquery(self, messages: list[dict], tools: list[dict]) -> dict:
+        async for attempt in async_retry(
+            logger=self.logger, abort_exceptions=self.abort_exceptions
+        ):
+            with attempt:
+                response = await self._aquery(
+                    self._prepare_messages(messages), self._prepare_tools(tools)
+                )
+
+        cost_info = self._calculate_cost(response)
+        GLOBAL_MODEL_STATS.add(cost_info["cost"])
+        usage_info = self._extract_usage(response)
+
+        message = self._build_message(response)
+        message["extra"] = {
+            "actions": self._parse_actions(response),
+            "response": self._dump_response(response),
+            **cost_info,
+            **usage_info,
+            "timestamp": time.time(),
+        }
+        return message
+
+    async def _aquery(self, messages: list[dict], tools: list[dict]):
+        return await litellm.acompletion(
             model=self.config.model_name,
             messages=messages,
             tools=tools,

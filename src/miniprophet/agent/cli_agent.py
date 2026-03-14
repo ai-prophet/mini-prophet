@@ -165,7 +165,7 @@ class CliForecastAgent(DefaultForecastAgent):
     # Override run to install/restore signal handler
     # ------------------------------------------------------------------
 
-    def run(
+    async def arun(
         self,
         title: str,
         outcomes: list[str],
@@ -177,7 +177,7 @@ class CliForecastAgent(DefaultForecastAgent):
             self._original_sigint_handler = signal.getsignal(signal.SIGINT)
             signal.signal(signal.SIGINT, self._handle_sigint)
         try:
-            return super().run(title, outcomes, ground_truth, **runtime_kwargs)
+            return await super().arun(title, outcomes, ground_truth, **runtime_kwargs)
         finally:
             if self._original_sigint_handler is not None:
                 signal.signal(signal.SIGINT, self._original_sigint_handler)
@@ -213,6 +213,29 @@ class CliForecastAgent(DefaultForecastAgent):
 
         return result
 
+    async def astep(self) -> list[dict]:
+        self._prepare_messages_for_step()
+
+        message = await self.aquery()
+
+        has_actions = bool(message.get("extra", {}).get("actions", []))
+
+        if self._interrupt_requested and not has_actions:
+            self._prompt_user_message()
+            if self.context_manager is not None:
+                self.context_manager.display()
+            return list(self.messages)
+
+        result = await self.aexecute_actions(message)
+
+        if self._interrupt_requested:
+            self._prompt_user_message()
+
+        if self.context_manager is not None:
+            self.context_manager.display()
+
+        return result
+
     # ------------------------------------------------------------------
     # Override query to show a spinner while waiting for the model
     # ------------------------------------------------------------------
@@ -222,3 +245,9 @@ class CliForecastAgent(DefaultForecastAgent):
         spinner = Spinner("dots", text=f"  {model_name} is forecasting...")
         with Live(spinner, console=console, transient=True):
             return super().query()
+
+    async def aquery(self) -> dict:
+        model_name = getattr(self.model.config, "model_name", "model")
+        spinner = Spinner("dots", text=f"  {model_name} is forecasting...")
+        with Live(spinner, console=console, transient=True):
+            return await super().aquery()

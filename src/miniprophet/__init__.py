@@ -35,6 +35,8 @@ class Model(Protocol):
 
     def query(self, messages: list[dict], tools: list[dict]) -> dict: ...
 
+    async def aquery(self, messages: list[dict], tools: list[dict]) -> dict: ...
+
     def format_message(self, **kwargs) -> dict: ...
 
     def format_observation_messages(self, message: dict, outputs: list[dict]) -> list[dict]: ...
@@ -52,6 +54,8 @@ class Tool(Protocol):
 
     def execute(self, args: dict) -> dict: ...
 
+    async def aexecute(self, args: dict) -> dict: ...
+
     def display(self, output: dict) -> None: ...
 
 
@@ -61,6 +65,8 @@ class Environment(Protocol):
     _tools: dict[str, Tool]
 
     def execute(self, action: dict, **kwargs) -> dict: ...
+
+    async def aexecute(self, action: dict, **kwargs) -> dict: ...
 
     def get_tool_schemas(self) -> list[dict]: ...
 
@@ -75,10 +81,42 @@ class ContextManager(Protocol):
     def display(self) -> None: ...
 
 
+class Agent(Protocol):
+    """Protocol for forecast agents."""
+
+    async def arun(
+        self,
+        title: str,
+        outcomes: list[str],
+        ground_truth: dict[str, int] | None = None,
+        **kw,
+    ) -> dict: ...
+
+    def run(
+        self,
+        title: str,
+        outcomes: list[str],
+        ground_truth: dict[str, int] | None = None,
+        **kw,
+    ) -> dict: ...
+
+    @property
+    def total_cost(self) -> float: ...
+
+    @property
+    def model_cost(self) -> float: ...
+
+    @property
+    def search_cost(self) -> float: ...
+
+    def save(self, path: Path | None, *extra_dicts: dict) -> dict: ...
+
+
 def __getattr__(name: str) -> Any:
     """Lazy imports for public batch API to avoid circular imports."""
     _lazy = {
         "batch_forecast": "miniprophet.eval.batch",
+        "abatch_forecast": "miniprophet.eval.batch",
         "ForecastProblem": "miniprophet.eval.types",
         "ForecastResult": "miniprophet.eval.types",
         "BatchProgressCallback": "miniprophet.eval.types",
@@ -96,9 +134,11 @@ __all__ = [
     "Tool",
     "Environment",
     "ContextManager",
+    "Agent",
     "package_dir",
     "__version__",
     "batch_forecast",
+    "abatch_forecast",
     "ForecastProblem",
     "ForecastResult",
     "BatchProgressCallback",

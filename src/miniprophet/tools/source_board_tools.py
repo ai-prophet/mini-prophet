@@ -124,6 +124,9 @@ class AddSourceTool:
     def get_schema(self) -> dict:
         return ADD_SOURCE_SCHEMA
 
+    async def aexecute(self, args: dict) -> dict:
+        return self.execute(args)
+
     def execute(self, args: dict) -> dict:
         source_id = args.get("source_id", "")
         if isinstance(source_id, int):
@@ -175,6 +178,9 @@ class EditNoteTool:
 
     def get_schema(self) -> dict:
         return EDIT_NOTE_SCHEMA
+
+    async def aexecute(self, args: dict) -> dict:
+        return self.execute(args)
 
     def execute(self, args: dict) -> dict:
         board_id = args.get("board_id")
