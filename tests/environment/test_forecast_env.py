@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 
 from conftest import DummySearchTool
@@ -20,7 +21,7 @@ class _EchoTool:
     def get_schema(self) -> dict:
         return {"type": "function", "function": {"name": self._name, "parameters": {}}}
 
-    def execute(self, args: dict) -> dict:
+    async def execute(self, args: dict) -> dict:
         return {"output": json.dumps(args, sort_keys=True)}
 
     def display(self, output: dict) -> None:
@@ -30,8 +31,10 @@ class _EchoTool:
 def test_forecast_environment_execute_passes_runtime_kwargs() -> None:
     env = ForecastEnvironment([_EchoTool("echo")])
 
-    output = env.execute(
-        {"name": "echo", "arguments": '{"query": "x"}'}, search_date_before="01/02/2026"
+    output = asyncio.run(
+        env.execute(
+            {"name": "echo", "arguments": '{"query": "x"}'}, search_date_before="01/02/2026"
+        )
     )
 
     payload = json.loads(output["output"])
@@ -41,14 +44,14 @@ def test_forecast_environment_execute_passes_runtime_kwargs() -> None:
 
 def test_forecast_environment_execute_handles_invalid_json() -> None:
     env = ForecastEnvironment([_EchoTool("echo")])
-    output = env.execute({"name": "echo", "arguments": "{"})
+    output = asyncio.run(env.execute({"name": "echo", "arguments": "{"}))
     assert output["error"] is True
     assert "Invalid JSON" in output["output"]
 
 
 def test_forecast_environment_execute_unknown_tool() -> None:
     env = ForecastEnvironment([_EchoTool("echo")])
-    output = env.execute({"name": "missing", "arguments": "{}"})
+    output = asyncio.run(env.execute({"name": "missing", "arguments": "{}"}))
     assert output["error"] is True
     assert "Unknown tool" in output["output"]
 
@@ -61,13 +64,15 @@ def test_create_default_tools_and_serialize_sources_state(two_sources: list[Sour
 
     search_tool = env.get_tool("search")
     assert isinstance(search_tool, SearchForecastTool)
-    search_tool.execute({"query": "q"})
+    asyncio.run(search_tool.execute({"query": "q"}))
 
-    add_result = env.execute(
-        {
-            "name": "add_source",
-            "arguments": '{"source_id": "S1", "note": "n", "reaction": {"A": "neutral"}}',
-        }
+    add_result = asyncio.run(
+        env.execute(
+            {
+                "name": "add_source",
+                "arguments": '{"source_id": "S1", "note": "n", "reaction": {"A": "neutral"}}',
+            }
+        )
     )
     assert "added to board" in add_result["output"]
 

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 import requests
 
@@ -127,7 +129,7 @@ class TestBraveSearch:
             backend, "_fetch_article_text", lambda url: "extracted" if "a.com" in url else None
         )
 
-        result = backend.search("query")
+        result = asyncio.run(backend.search("query"))
         assert len(result.sources) == 1
         assert result.sources[0].url == "https://a.com"
         assert result.cost == 0.0
@@ -138,8 +140,8 @@ class TestBraveSearch:
         monkeypatch.setattr(backend, "_get_links", lambda q, limit, **kw: [])
         monkeypatch.setattr(backend, "_fetch_article_text", lambda url: None)
 
-        result = backend.search(
-            "query", search_date_before="01/01/2026", search_date_after="12/01/2025"
+        result = asyncio.run(
+            backend.search("query", search_date_before="01/01/2026", search_date_after="12/01/2025")
         )
         assert result.sources == []
 

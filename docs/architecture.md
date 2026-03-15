@@ -16,12 +16,12 @@ This page explains the core agent loop and how state flows through the system.
 
 ```mermaid
 flowchart TD
-    A["Initialize run<br/>(system + problem prompt)"] --> B["step()"]
+    A["Initialize run<br/>(system + problem prompt)"] --> B["await step()"]
     B --> C["Context manager<br/>(truncate / summarize if needed)"]
     C --> D["Inject invariant source board<br/>at message index 2"]
-    D --> E["Model query<br/>with tool schemas"]
+    D --> E["await model.query()<br/>with tool schemas"]
     E --> F["Assistant tool call"]
-    F --> G["Environment executes tool"]
+    F --> G["await env.execute()"]
     G --> H["Observation message(s)"]
     H --> I{"Exit role reached?"}
     I -- "No" --> B
@@ -72,10 +72,10 @@ Default tool set:
 
 Runtime kwargs supplied to `agent.run(...)` are passed through:
 
-- `DefaultForecastAgent.execute_actions(...)`
-- `ForecastEnvironment.execute(...)`
-- tool `execute(...)`
-- backend searcher `search(..., **kwargs)`
+- `await DefaultForecastAgent.execute_actions(...)`
+- `await ForecastEnvironment.execute(...)`
+- `await tool.execute(...)`
+- `await backend.search(..., **kwargs)`
 
 This is how run-level date bounds reach backend-specific search filters.
 

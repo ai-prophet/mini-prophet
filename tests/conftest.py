@@ -48,7 +48,7 @@ class DummyModel:
         self._messages = list(scripted_messages or [])
         self.n_queries = 0
 
-    def query(self, messages: list[dict], tools: list[dict]) -> dict:
+    async def query(self, messages: list[dict], tools: list[dict]) -> dict:
         self.n_queries += 1
         if not self._messages:
             return {
@@ -112,7 +112,7 @@ class DummyEnvironment:
         if with_board:
             self.board = DummyBoard()
 
-    def execute(self, action: dict, **kwargs) -> dict:
+    async def execute(self, action: dict, **kwargs) -> dict:
         self.executed.append((action, kwargs))
         if self.outputs:
             return self.outputs.pop(0)
@@ -150,7 +150,7 @@ class DummySearchTool:
         self._error = error
         self.calls: list[dict[str, Any]] = []
 
-    def search(self, query: str, limit: int = 5, **kwargs) -> SearchResult:
+    async def search(self, query: str, limit: int = 5, **kwargs) -> SearchResult:
         self.calls.append({"query": query, "limit": limit, "kwargs": kwargs})
         if self._error is not None:
             raise self._error

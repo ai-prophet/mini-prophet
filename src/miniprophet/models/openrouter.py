@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 import time
@@ -12,7 +11,7 @@ import requests
 from pydantic import BaseModel
 
 from miniprophet.models import GLOBAL_MODEL_STATS
-from miniprophet.models.retry import async_retry, retry
+from miniprophet.models.retry import retry
 from miniprophet.models.utils import (
     format_observation_messages,
     parse_single_action,
@@ -52,71 +51,14 @@ class OpenRouterModel:
         self._api_key = os.getenv("OPENROUTER_API_KEY", "")
 
     # ------------------------------------------------------------------
-    # Core query
-    # ------------------------------------------------------------------
-
-    def query(self, messages: list[dict], tools: list[dict]) -> dict:
-        prepared = [{k: v for k, v in msg.items() if k != "extra"} for msg in messages]
-        for attempt in retry(logger=logger, abort_exceptions=self.abort_exceptions):
-            with attempt:
-                response = self._query(prepared, tools)
-
-        cost_info = self._calculate_cost(response)
-        GLOBAL_MODEL_STATS.add(cost_info["cost"])
-        usage_info = self._extract_usage(response)
-
-        message = dict(response["choices"][0]["message"])
-        message["extra"] = {
-            "actions": self._parse_actions(response),
-            "response": response,
-            **cost_info,
-            **usage_info,
-            "timestamp": time.time(),
-        }
-        return message
-
-    def _query(self, messages: list[dict], tools: list[dict]) -> dict:
-        headers = {
-            "Authorization": f"Bearer {self._api_key}",
-            "Content-Type": "application/json",
-        }
-        payload = {
-            "model": self.config.model_name,
-            "messages": messages,
-            "tools": tools,
-            "usage": {"include": True},
-            **self.config.model_kwargs,
-        }
-
-        try:
-            resp = requests.post(
-                self._api_url,
-                headers=headers,
-                data=json.dumps(payload),
-                timeout=120,
-            )
-            resp.raise_for_status()
-            return resp.json()
-        except requests.exceptions.HTTPError:
-            if resp.status_code == 401:
-                raise OpenRouterAuthenticationError(
-                    "Authentication failed. Check OPENROUTER_API_KEY."
-                )
-            if resp.status_code == 429:
-                raise OpenRouterRateLimitError("Rate limit exceeded")
-            raise OpenRouterAPIError(f"HTTP {resp.status_code}: {resp.text[:300]}")
-        except requests.exceptions.RequestException as exc:
-            raise OpenRouterAPIError(f"Request failed: {exc}") from exc
-
-    # ------------------------------------------------------------------
     # Async core query
     # ------------------------------------------------------------------
 
-    async def aquery(self, messages: list[dict], tools: list[dict]) -> dict:
+    async def query(self, messages: list[dict], tools: list[dict]) -> dict:
         prepared = [{k: v for k, v in msg.items() if k != "extra"} for msg in messages]
-        async for attempt in async_retry(logger=logger, abort_exceptions=self.abort_exceptions):
+        async for attempt in retry(logger=logger, abort_exceptions=self.abort_exceptions):
             with attempt:
-                response = await self._aquery(prepared, tools)
+                response = await self._query(prepared, tools)
 
         cost_info = self._calculate_cost(response)
         GLOBAL_MODEL_STATS.add(cost_info["cost"])
@@ -132,7 +74,7 @@ class OpenRouterModel:
         }
         return message
 
-    async def _aquery(self, messages: list[dict], tools: list[dict]) -> dict:
+    async def _query(self, messages: list[dict], tools: list[dict]) -> dict:
         import httpx
 
         headers = {

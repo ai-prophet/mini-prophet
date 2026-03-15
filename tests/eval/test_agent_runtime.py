@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-import threading
+import asyncio
 
-import pytest
 from conftest import DummyEnvironment, DummyModel
 
 from miniprophet.agent.default import DefaultForecastAgent
 from miniprophet.eval.agent_runtime import EvalBatchAgentWrapper, RateLimitCoordinator
-from miniprophet.exceptions import BatchRunTimeoutError
 
 
 def test_cancel_event_stops_agent_step() -> None:
@@ -47,11 +45,7 @@ def test_wrapper_pre_run_guard_checks_cancel_event() -> None:
     with pytest.raises(BatchRunTimeoutError, match="timed out"):
         wrapper.run(title="test", outcomes=["Yes", "No"])
 
+        # Should be paused now — wait with timeout to prove it resumes
+        await asyncio.wait_for(coordinator.wait_if_paused(), timeout=1.0)
 
-def test_rate_limit_coordinator_wait_cancelled() -> None:
-    coordinator = RateLimitCoordinator(backoff_seconds=0.2)
-    coordinator.signal_rate_limit(backoff_seconds=0.2)
-    cancel = threading.Event()
-    cancel.set()
-
-    assert coordinator.wait_if_paused(cancel_event=cancel) is False
+    asyncio.run(_test())

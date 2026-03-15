@@ -120,16 +120,16 @@ class DefaultForecastAgent:
         pass
 
     # Core loop
-    def run(
+    def run_sync(
         self,
         title: str,
         outcomes: list[str],
         ground_truth: dict[str, int] | None = None,
         **runtime_kwargs,
     ) -> ForecastResult:
-        return asyncio.run(self.arun(title, outcomes, ground_truth, **runtime_kwargs))
+        return asyncio.run(self.run(title, outcomes, ground_truth, **runtime_kwargs))
 
-    async def arun(
+    async def run(
         self,
         title: str,
         outcomes: list[str],
@@ -175,7 +175,7 @@ class DefaultForecastAgent:
 
         while True:
             try:
-                await self.astep()
+                await self.step()
             except InterruptAgentFlow as exc:
                 self.add_messages(*exc.messages)
             except Exception as exc:
@@ -223,91 +223,9 @@ class DefaultForecastAgent:
         if self._cancel_event is not None and self._cancel_event.is_set():
             raise BatchRunTimeoutError("Run cancelled (timeout).")
         self._prepare_messages_for_step()
-        return self.execute_actions(self.query())
+        return await self.execute_actions(await self.query())
 
-    async def astep(self) -> list[dict]:
-        self._prepare_messages_for_step()
-        return await self.aexecute_actions(await self.aquery())
-
-    def query(self) -> dict:
-        step_limit_hit = 0 < self.config.step_limit <= self.n_calls
-        cost_limit_hit = 0 < self.config.cost_limit <= self.total_cost
-
-        if step_limit_hit or cost_limit_hit:
-            if self.config.enable_grace_period and not self._in_grace_period:
-                self._in_grace_period = True
-                self._grace_period_turns = 0
-
-            if self._in_grace_period:
-                if self._grace_period_turns >= self.config.grace_period_extra_turns:
-                    raise LimitsExceeded(
-                        {
-                            "role": "exit",
-                            "content": "Grace period exhausted.",
-                            "extra": {"exit_status": "LimitsExceeded", "submission": ""},
-                        }
-                    )
-                self.add_messages(
-                    self.model.format_message(
-                        role="user",
-                        content=self.config.grace_period_prompt,
-                    )
-                )
-                self._grace_period_turns += 1
-            else:
-                limit_type = "Step" if step_limit_hit else "Cost"
-                raise LimitsExceeded(
-                    {
-                        "role": "exit",
-                        "content": f"{limit_type} limit exceeded.",
-                        "extra": {"exit_status": "LimitsExceeded", "submission": ""},
-                    }
-                )
-
-        self.n_calls += 1
-        # Snapshot the messages the model will actually see (post-truncation, post-board inject)
-        input_snapshot = list(self.messages)
-        tools = self.env.get_tool_schemas()
-        message = self.model.query(self.messages, tools)
-        extra = message.get("extra", {})
-        self.model_cost += extra.get("cost", 0.0)
-        self.prompt_tokens = extra.get("prompt_tokens", self.prompt_tokens)
-        self.completion_tokens = extra.get("completion_tokens", self.completion_tokens)
-        self.add_messages(message)
-        self._trajectory.record_step(input_snapshot, message)
-
-        self.on_step_start()
-        self.on_model_response(message)
-        return message
-
-    def execute_actions(self, message: dict) -> list[dict]:
-        actions = message.get("extra", {}).get("actions", [])
-        outputs: list[dict] = []
-        for action in actions:
-            if self._in_grace_period and action.get("name") != "submit":
-                outputs.append(
-                    {
-                        "output": self.config.grace_period_prompt,
-                        "error": True,
-                    }
-                )
-            else:
-                outputs.append(self.env.execute(action, **self.runtime_kwargs))
-        for action, output in zip(actions, outputs):
-            sc = output.get("search_cost", 0.0)
-            if sc:
-                self.search_cost += sc
-                self.n_searches += 1
-            if action.get("name") == "search" and self.context_manager is not None:
-                raw = action.get("arguments", "{}")
-                args = json.loads(raw) if isinstance(raw, str) else raw
-                query = args.get("query", "")
-                if query and hasattr(self.context_manager, "record_query"):
-                    self.context_manager.record_query(query)  # type: ignore
-            self.on_observation(action, output)
-        return self.add_messages(*self.model.format_observation_messages(message, outputs))
-
-    async def aquery(self) -> dict:
+    async def query(self) -> dict:
         step_limit_hit = 0 < self.config.step_limit <= self.n_calls
         cost_limit_hit = 0 < self.config.cost_limit <= self.total_cost
 
@@ -345,10 +263,7 @@ class DefaultForecastAgent:
         self.n_calls += 1
         input_snapshot = list(self.messages)
         tools = self.env.get_tool_schemas()
-        if hasattr(self.model, "aquery"):
-            message = await self.model.aquery(self.messages, tools)
-        else:
-            message = await asyncio.to_thread(self.model.query, self.messages, tools)
+        message = await self.model.query(self.messages, tools)
         extra = message.get("extra", {})
         self.model_cost += extra.get("cost", 0.0)
         self.prompt_tokens = extra.get("prompt_tokens", self.prompt_tokens)
@@ -360,7 +275,7 @@ class DefaultForecastAgent:
         self.on_model_response(message)
         return message
 
-    async def aexecute_actions(self, message: dict) -> list[dict]:
+    async def execute_actions(self, message: dict) -> list[dict]:
         actions = message.get("extra", {}).get("actions", [])
         outputs: list[dict] = []
         for action in actions:
@@ -372,10 +287,7 @@ class DefaultForecastAgent:
                     }
                 )
             else:
-                if hasattr(self.env, "aexecute"):
-                    outputs.append(await self.env.aexecute(action, **self.runtime_kwargs))
-                else:
-                    outputs.append(self.env.execute(action, **self.runtime_kwargs))
+                outputs.append(await self.env.execute(action, **self.runtime_kwargs))
         for action, output in zip(actions, outputs):
             sc = output.get("search_cost", 0.0)
             if sc:

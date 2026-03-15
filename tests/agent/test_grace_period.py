@@ -13,7 +13,7 @@ from miniprophet.exceptions import Submitted
 class _SubmitEnv(DummyEnvironment):
     """Environment that handles submit by raising Submitted."""
 
-    def execute(self, action: dict, **kwargs) -> dict:
+    async def execute(self, action: dict, **kwargs) -> dict:
         if action.get("name") == "submit":
             raise Submitted(
                 {
@@ -26,7 +26,7 @@ class _SubmitEnv(DummyEnvironment):
                     },
                 }
             )
-        return super().execute(action, **kwargs)
+        return await super().execute(action, **kwargs)
 
 
 TEST_GRACE_PROMPT = "Submit now using the submit tool."
@@ -68,7 +68,7 @@ def test_grace_period_allows_submit_after_step_limit(
     env = _SubmitEnv()
     agent = DefaultForecastAgent(model=model, env=env, **_grace_kwargs(tmp_path))
 
-    result = agent.run(title="Q", outcomes=["Yes", "No"])
+    result = agent.run_sync(title="Q", outcomes=["Yes", "No"])
 
     assert result["exit_status"] == "submitted"
     assert result["submission"] == {"Yes": 0.7, "No": 0.3}
@@ -95,7 +95,7 @@ def test_grace_period_rejects_non_submit_tools(assistant_action_message, tmp_pat
     env = _SubmitEnv()
     agent = DefaultForecastAgent(model=model, env=env, **_grace_kwargs(tmp_path))
 
-    result = agent.run(title="Q", outcomes=["Yes", "No"])
+    result = agent.run_sync(title="Q", outcomes=["Yes", "No"])
 
     assert result["exit_status"] == "submitted"
     assert agent._grace_period_turns == 2
@@ -118,7 +118,7 @@ def test_grace_period_exhausted_after_extra_turns(assistant_action_message, tmp_
     env = _SubmitEnv()
     agent = DefaultForecastAgent(model=model, env=env, **_grace_kwargs(tmp_path))
 
-    result = agent.run(title="Q", outcomes=["Yes", "No"])
+    result = agent.run_sync(title="Q", outcomes=["Yes", "No"])
 
     assert result["exit_status"] == "LimitsExceeded"
     assert agent._grace_period_turns == 3
@@ -136,7 +136,7 @@ def test_grace_period_disabled_fails_immediately(assistant_action_message, tmp_p
     kwargs = _grace_kwargs(tmp_path, enable_grace_period=False)
     agent = DefaultForecastAgent(model=model, env=env, **kwargs)
 
-    result = agent.run(title="Q", outcomes=["Yes", "No"])
+    result = agent.run_sync(title="Q", outcomes=["Yes", "No"])
 
     assert result["exit_status"] == "LimitsExceeded"
     assert agent._in_grace_period is False
@@ -159,7 +159,7 @@ def test_grace_period_prompt_injected_as_user_message(
     env = _SubmitEnv()
     agent = DefaultForecastAgent(model=model, env=env, **_grace_kwargs(tmp_path))
 
-    agent.run(title="Q", outcomes=["Yes", "No"])
+    agent.run_sync(title="Q", outcomes=["Yes", "No"])
 
     # Find the grace period prompt in messages
     grace_messages = [
@@ -186,7 +186,7 @@ def test_grace_period_custom_prompt(assistant_action_message, tmp_path: Path) ->
     kwargs = _grace_kwargs(tmp_path, grace_period_prompt=custom_prompt)
     agent = DefaultForecastAgent(model=model, env=env, **kwargs)
 
-    agent.run(title="Q", outcomes=["Yes", "No"])
+    agent.run_sync(title="Q", outcomes=["Yes", "No"])
 
     custom_messages = [
         m for m in agent.messages if m.get("content") == custom_prompt and m.get("role") == "user"
@@ -199,9 +199,9 @@ def test_grace_period_keeps_all_tool_schemas(assistant_action_message, tmp_path:
     tools_seen: list[list[dict]] = []
 
     class _RecordingModel(DummyModel):
-        def query(self, messages, tools):
+        async def query(self, messages, tools):
             tools_seen.append(tools)
-            return super().query(messages, tools)
+            return await super().query(messages, tools)
 
     model = _RecordingModel(
         scripted_messages=[
@@ -220,7 +220,7 @@ def test_grace_period_keeps_all_tool_schemas(assistant_action_message, tmp_path:
     }
     agent = DefaultForecastAgent(model=model, env=env, **_grace_kwargs(tmp_path))
 
-    agent.run(title="Q", outcomes=["Yes", "No"])
+    agent.run_sync(title="Q", outcomes=["Yes", "No"])
 
     # All queries should receive the same full set of tool schemas
     assert tools_seen[-1] == tools_seen[0]

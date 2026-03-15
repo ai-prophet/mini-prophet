@@ -68,22 +68,7 @@ class ForecastEnvironment:
         self.board = board
         self._tools: dict[str, Tool] = {t.name: t for t in tools}
 
-    def execute(self, action: dict, **kwargs) -> dict:
-        tool_name = action.get("name", "")
-        try:
-            raw_args = action.get("arguments", "{}")
-            args = json.loads(raw_args) if isinstance(raw_args, str) else raw_args
-        except json.JSONDecodeError as exc:
-            return {"output": f"Invalid JSON in tool arguments: {exc}", "error": True}
-
-        tool = self._tools.get(tool_name)
-        if tool is None:
-            return {"output": f"Unknown tool: {tool_name}", "error": True}
-        # override the agent's args with runtime kwargs
-        args.update(kwargs)
-        return tool.execute(args)
-
-    async def aexecute(self, action: dict, **kwargs) -> dict:
+    async def execute(self, action: dict, **kwargs) -> dict:
         tool_name = action.get("name", "")
         try:
             raw_args = action.get("arguments", "{}")
@@ -95,9 +80,7 @@ class ForecastEnvironment:
         if tool is None:
             return {"output": f"Unknown tool: {tool_name}", "error": True}
         args.update(kwargs)
-        if hasattr(tool, "aexecute"):
-            return await tool.aexecute(args)
-        return tool.execute(args)
+        return await tool.execute(args)
 
     def get_tool_schemas(self) -> list[dict]:
         return [t.get_schema() for t in self._tools.values()]

@@ -72,71 +72,7 @@ class TavilySearchBackend:
         self._client = TavilyClient(api_key=self._api_key)
         self._async_client = None
 
-    def search(self, query: str, limit: int = 5, **kwargs: Any) -> SearchResult:
-        payload: dict[str, Any] = {
-            "query": query,
-            "max_results": min(limit, 20),
-            "search_depth": self._search_depth,
-            "topic": self._topic,
-            "country": self._country,
-            "include_raw_content": False,
-            "include_answer": False,
-            "include_images": False,
-            "include_usage": True,
-            "timeout": self._timeout,
-        }
-
-        # Handle runtime date filters (MM/DD/YYYY -> YYYY-MM-DD)
-        search_date_after = kwargs.pop("search_date_after", None)
-        search_date_before = kwargs.pop("search_date_before", None)
-        payload.update(kwargs)
-
-        if search_date_after:
-            payload["start_date"] = self._date_mmddyyyy_to_iso(search_date_after)
-        if search_date_before:
-            payload["end_date"] = self._date_mmddyyyy_to_iso(search_date_before)
-
-        payload = {k: v for k, v in payload.items() if v is not None}
-
-        try:
-            resp = self._client.search(**payload)
-        except (InvalidAPIKeyError, MissingAPIKeyError) as exc:
-            raise SearchAuthError(
-                "Tavily API authentication failed. Check TAVILY_API_KEY."
-            ) from exc
-        except UsageLimitExceededError as exc:
-            raise SearchRateLimitError("Tavily API usage limit exceeded") from exc
-        except Exception as exc:
-            status_code = getattr(exc, "status_code", None)
-            if status_code is None:
-                status_code = getattr(getattr(exc, "response", None), "status_code", None)
-
-            if status_code == 401:
-                raise SearchAuthError(
-                    "Tavily API authentication failed. Check TAVILY_API_KEY."
-                ) from exc
-            if status_code == 429:
-                raise SearchRateLimitError("Tavily API rate limit exceeded") from exc
-            raise SearchNetworkError(f"Tavily SDK request failed: {exc}") from exc
-
-        sources: list[Source] = []
-        for item in resp.get("results", []):
-            url = item.get("url", "")
-            if not url:
-                continue
-
-            title = item.get("title", "") or url
-            content = item.get("content", "")
-            snippet = content[: self._max_characters] if content else ""
-            date = item.get("published_date") or None
-
-            sources.append(Source(url=url, title=title, snippet=snippet, date=date))
-
-        cost = self._extract_cost(resp)
-        logger.info(f"Tavily search '{query}': {len(sources)} source(s), cost={cost}")
-        return SearchResult(sources=sources, cost=cost)
-
-    async def asearch(self, query: str, limit: int = 5, **kwargs: Any) -> SearchResult:
+    async def search(self, query: str, limit: int = 5, **kwargs: Any) -> SearchResult:
         if self._async_client is None:
             from tavily import AsyncTavilyClient
 

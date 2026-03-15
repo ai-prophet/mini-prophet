@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import types
 from typing import Any
 
@@ -21,7 +22,7 @@ class _FakeClient:
         self._raise: Exception | None = None
         self.last_payload: dict = {}
 
-    def _create(self, **kwargs) -> Any:
+    async def _create(self, **kwargs) -> Any:
         self.last_payload = kwargs
         if self._raise is not None:
             raise self._raise
@@ -45,6 +46,7 @@ def backend_and_client(
         lambda api_key, timeout: fake_client,
     )
     backend = PerplexitySearchBackend()
+    backend._async_client = fake_client
     return backend, fake_client
 
 
@@ -67,7 +69,7 @@ class TestPerplexitySearch:
             ]
         )
 
-        result = backend.search("test query", limit=5)
+        result = asyncio.run(backend.search("test query", limit=5))
         assert len(result.sources) == 2
         assert result.cost == pytest.approx(PERPLEXITY_PER_SEARCH_COST)
         assert result.sources[0].url == "https://a.com"
@@ -80,7 +82,9 @@ class TestPerplexitySearch:
         backend, client = backend_and_client
         client._response = types.SimpleNamespace(results=[])
 
-        backend.search("test", search_date_after="01/01/2026", search_date_before="03/01/2026")
+        asyncio.run(
+            backend.search("test", search_date_after="01/01/2026", search_date_before="03/01/2026")
+        )
         assert client.last_payload["search_after_date_filter"] == "01/01/2026"
         assert client.last_payload["search_before_date_filter"] == "03/01/2026"
 
@@ -103,7 +107,7 @@ class TestPerplexitySearch:
         exc.status_code = status_code  # type: ignore[attr-defined]
         client._raise = exc
         with pytest.raises(exc_type, match=match):
-            backend.search("test")
+            asyncio.run(backend.search("test"))
 
     def test_network_error_raises_search_network_error(
         self, backend_and_client: tuple[PerplexitySearchBackend, _FakeClient]
@@ -111,7 +115,7 @@ class TestPerplexitySearch:
         backend, client = backend_and_client
         client._raise = ConnectionError("connection refused")
         with pytest.raises(SearchNetworkError, match="request failed"):
-            backend.search("test")
+            asyncio.run(backend.search("test"))
 
     def test_status_code_from_response_attribute(
         self, backend_and_client: tuple[PerplexitySearchBackend, _FakeClient]
@@ -122,7 +126,7 @@ class TestPerplexitySearch:
         client._raise = exc
 
         with pytest.raises(SearchAuthError):
-            backend.search("test")
+            asyncio.run(backend.search("test"))
 
 
 class TestPerplexitySerialize:

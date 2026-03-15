@@ -33,9 +33,7 @@ class Model(Protocol):
 
     config: Any
 
-    def query(self, messages: list[dict], tools: list[dict]) -> dict: ...
-
-    async def aquery(self, messages: list[dict], tools: list[dict]) -> dict: ...
+    async def query(self, messages: list[dict], tools: list[dict]) -> dict: ...
 
     def format_message(self, **kwargs) -> dict: ...
 
@@ -52,9 +50,7 @@ class Tool(Protocol):
 
     def get_schema(self) -> dict: ...
 
-    def execute(self, args: dict) -> dict: ...
-
-    async def aexecute(self, args: dict) -> dict: ...
+    async def execute(self, args: dict) -> dict: ...
 
     def display(self, output: dict) -> None: ...
 
@@ -64,9 +60,7 @@ class Environment(Protocol):
 
     _tools: dict[str, Tool]
 
-    def execute(self, action: dict, **kwargs) -> dict: ...
-
-    async def aexecute(self, action: dict, **kwargs) -> dict: ...
+    async def execute(self, action: dict, **kwargs) -> dict: ...
 
     def get_tool_schemas(self) -> list[dict]: ...
 
@@ -84,7 +78,7 @@ class ContextManager(Protocol):
 class Agent(Protocol):
     """Protocol for forecast agents."""
 
-    async def arun(
+    async def run(
         self,
         title: str,
         outcomes: list[str],
@@ -92,7 +86,7 @@ class Agent(Protocol):
         **kw,
     ) -> dict: ...
 
-    def run(
+    def run_sync(
         self,
         title: str,
         outcomes: list[str],
@@ -116,7 +110,7 @@ def __getattr__(name: str) -> Any:
     """Lazy imports for public batch API to avoid circular imports."""
     _lazy = {
         "batch_forecast": "miniprophet.eval.batch",
-        "abatch_forecast": "miniprophet.eval.batch",
+        "batch_forecast_sync": "miniprophet.eval.batch",
         "ForecastProblem": "miniprophet.eval.types",
         "ForecastResult": "miniprophet.eval.types",
         "BatchProgressCallback": "miniprophet.eval.types",
@@ -138,7 +132,7 @@ __all__ = [
     "package_dir",
     "__version__",
     "batch_forecast",
-    "abatch_forecast",
+    "batch_forecast_sync",
     "ForecastProblem",
     "ForecastResult",
     "BatchProgressCallback",

@@ -66,7 +66,7 @@ def _load_config(config: dict | str | Path | None) -> dict:
     return recursive_merge(defaults, user)
 
 
-async def _aprocess_problem(
+async def _process_problem(
     problem: ForecastProblem,
     *,
     config: dict,
@@ -145,7 +145,7 @@ async def _aprocess_problem(
         }
 
         forecast = await asyncio.wait_for(
-            agent.arun(
+            agent.run(
                 title=problem.title,
                 outcomes=problem.outcomes,
                 ground_truth=problem.ground_truth,
@@ -227,7 +227,7 @@ async def _aprocess_problem(
         return result, True
 
 
-async def abatch_forecast(
+async def batch_forecast(
     problems: list[ForecastProblem],
     config: dict | str | Path | None = None,
     *,
@@ -273,7 +273,7 @@ async def abatch_forecast(
             for attempt in range(MAX_RETRIES + 1):
                 try:
                     await coordinator.wait_if_paused()
-                    result, done = await _aprocess_problem(
+                    result, done = await _process_problem(
                         problem,
                         config=resolved_config,
                         model=model,
@@ -332,7 +332,7 @@ async def abatch_forecast(
     ]
 
 
-def batch_forecast(
+def batch_forecast_sync(
     problems: list[ForecastProblem],
     config: dict | str | Path | None = None,
     *,
@@ -351,7 +351,7 @@ def batch_forecast(
 ) -> list[ForecastResult]:
     """Run forecasting problems in parallel and return results.
 
-    Sync wrapper around :func:`abatch_forecast`.
+    Sync wrapper around :func:`batch_forecast`.
 
     Args:
         problems: List of forecasting problems to solve.
@@ -377,7 +377,7 @@ def batch_forecast(
         List of ForecastResult, one per input problem, in the same order.
     """
     return asyncio.run(
-        abatch_forecast(
+        batch_forecast(
             problems,
             config,
             workers=workers,

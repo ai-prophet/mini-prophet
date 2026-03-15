@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import signal
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from conftest import DummyEnvironment, DummyModel
@@ -22,7 +22,7 @@ class _CliDummyEnvironment(DummyEnvironment):
 
 
 class _SubmitEnv(_CliDummyEnvironment):
-    def execute(self, action: dict, **kwargs) -> dict:
+    async def execute(self, action: dict, **kwargs) -> dict:
         if action.get("name") == "submit":
             raise Submitted(
                 {
@@ -35,7 +35,7 @@ class _SubmitEnv(_CliDummyEnvironment):
                     },
                 }
             )
-        return super().execute(action, **kwargs)
+        return await super().execute(action, **kwargs)
 
 
 def _agent_kwargs(tmp_path: Path) -> dict:
@@ -89,15 +89,15 @@ def test_interrupt_after_tool_action_injects_user_message(
     # Set the interrupt flag before step 1
     original_step = agent.step
 
-    def step_with_interrupt():
+    async def step_with_interrupt():
         # Set flag before the first step only
         if agent.n_calls == 0:
             agent._interrupt_requested = True
-        return original_step()
+        return await original_step()
 
     agent.step = step_with_interrupt
 
-    result = agent.run(title="Q?", outcomes=["Yes", "No"])
+    result = agent.run_sync(title="Q?", outcomes=["Yes", "No"])
 
     # The user message should be in the conversation
     user_interrupt_msgs = [m for m in agent.messages if m.get("extra", {}).get("is_user_interrupt")]
@@ -152,14 +152,14 @@ def test_interrupt_no_action_injects_user_message_directly(
 
     original_step = agent.step
 
-    def step_with_interrupt():
+    async def step_with_interrupt():
         if agent.n_calls == 0:
             agent._interrupt_requested = True
-        return original_step()
+        return await original_step()
 
     agent.step = step_with_interrupt
 
-    agent.run(title="Q?", outcomes=["Yes", "No"])
+    agent.run_sync(title="Q?", outcomes=["Yes", "No"])
 
     user_interrupt_msgs = [m for m in agent.messages if m.get("extra", {}).get("is_user_interrupt")]
     assert len(user_interrupt_msgs) == 1
@@ -197,14 +197,14 @@ def test_empty_input_does_not_inject_message(
 
     original_step = agent.step
 
-    def step_with_interrupt():
+    async def step_with_interrupt():
         if agent.n_calls == 0:
             agent._interrupt_requested = True
-        return original_step()
+        return await original_step()
 
     agent.step = step_with_interrupt
 
-    result = agent.run(title="Q?", outcomes=["Yes", "No"])
+    result = agent.run_sync(title="Q?", outcomes=["Yes", "No"])
 
     user_interrupt_msgs = [m for m in agent.messages if m.get("extra", {}).get("is_user_interrupt")]
     assert len(user_interrupt_msgs) == 0
@@ -249,7 +249,7 @@ def test_signal_handler_restored_after_run(
 
     original_handler = signal.getsignal(signal.SIGINT)
 
-    agent.run(title="Q?", outcomes=["Yes", "No"])
+    agent.run_sync(title="Q?", outcomes=["Yes", "No"])
 
     # After run, the original handler should be restored
     restored_handler = signal.getsignal(signal.SIGINT)
@@ -266,14 +266,14 @@ def test_signal_handler_restored_on_exception(
 ) -> None:
     # Model that raises an exception
     model = DummyModel(scripted_messages=[])
-    model.query = MagicMock(side_effect=RuntimeError("boom"))
+    model.query = AsyncMock(side_effect=RuntimeError("boom"))
     env = DummyEnvironment()
     agent = CliForecastAgent(model=model, env=env, **_agent_kwargs(tmp_path))
 
     original_handler = signal.getsignal(signal.SIGINT)
 
     with pytest.raises(RuntimeError, match="boom"):
-        agent.run(title="Q?", outcomes=["Yes", "No"])
+        agent.run_sync(title="Q?", outcomes=["Yes", "No"])
 
     restored_handler = signal.getsignal(signal.SIGINT)
     assert restored_handler is original_handler
@@ -302,6 +302,6 @@ def test_interactive_disabled_no_signal_handler(
     agent = CliForecastAgent(model=model, env=env, **kwargs)
 
     original_handler = signal.getsignal(signal.SIGINT)
-    agent.run(title="Q?", outcomes=["Yes", "No"])
+    agent.run_sync(title="Q?", outcomes=["Yes", "No"])
     # Handler should never have changed
     assert signal.getsignal(signal.SIGINT) is original_handler

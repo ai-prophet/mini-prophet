@@ -10,7 +10,7 @@ from miniprophet.exceptions import Submitted
 
 
 class _SubmitEnv(DummyEnvironment):
-    def execute(self, action: dict, **kwargs) -> dict:
+    async def execute(self, action: dict, **kwargs) -> dict:
         if action.get("name") == "submit":
             raise Submitted(
                 {
@@ -23,7 +23,7 @@ class _SubmitEnv(DummyEnvironment):
                     },
                 }
             )
-        return super().execute(action, **kwargs)
+        return await super().execute(action, **kwargs)
 
 
 def _agent_kwargs(tmp_path: Path) -> dict:
@@ -52,7 +52,7 @@ def test_default_agent_run_submitted_and_evaluated(
     env = _SubmitEnv()
     agent = DefaultForecastAgent(model=model, env=env, **_agent_kwargs(tmp_path))
 
-    result = agent.run(
+    result = agent.run_sync(
         title="Will X happen?",
         outcomes=["Yes", "No"],
         ground_truth={"Yes": 1, "No": 0},
@@ -95,7 +95,7 @@ def test_default_agent_tracks_search_cost_and_query_history(
     kwargs["step_limit"] = 1
     agent = DefaultForecastAgent(model=model, env=env, context_manager=ctx, **kwargs)
 
-    result = agent.run(title="Q", outcomes=["A", "B"])
+    result = agent.run_sync(title="Q", outcomes=["A", "B"])
 
     assert result["exit_status"] == "LimitsExceeded"
     assert agent.model_cost == pytest.approx(0.11)
@@ -115,4 +115,4 @@ def test_default_agent_rejects_invalid_outcome_count(tmp_path: Path) -> None:
     )
 
     with pytest.raises(ValueError, match="Too many outcomes"):
-        agent.run(title="Q", outcomes=["A", "B"])
+        agent.run_sync(title="Q", outcomes=["A", "B"])

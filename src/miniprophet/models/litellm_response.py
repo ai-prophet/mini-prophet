@@ -31,15 +31,7 @@ class LitellmResponseModel(LitellmModel):
     def __init__(self, **kwargs: Any) -> None:
         self.config = LitellmResponseModelConfig(**kwargs)
 
-    def _query(self, messages: list[dict], tools: list[dict]):
-        return litellm.responses(
-            model=self.config.model_name,
-            input=messages,
-            tools=tools,
-            **self.config.model_kwargs,
-        )
-
-    async def _aquery(self, messages: list[dict], tools: list[dict]):
+    async def _query(self, messages: list[dict], tools: list[dict]):
         return await litellm.aresponses(
             model=self.config.model_name,
             input=messages,

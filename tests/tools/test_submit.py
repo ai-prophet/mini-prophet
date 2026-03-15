@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 
 from miniprophet.environment.source_board import Source, SourceBoard
@@ -13,7 +15,7 @@ def test_submit_tool_raises_submitted_on_valid_probs(dummy_source: Source) -> No
     tool = SubmitTool(outcomes=["Yes", "No"], board=board)
 
     with pytest.raises(Submitted) as exc:
-        tool.execute({"probabilities": {"Yes": 0.7, "No": 0.3}})
+        asyncio.run(tool.execute({"probabilities": {"Yes": 0.7, "No": 0.3}}))
 
     payload = exc.value.messages[0]
     assert payload["extra"]["exit_status"] == "submitted"
@@ -22,7 +24,7 @@ def test_submit_tool_raises_submitted_on_valid_probs(dummy_source: Source) -> No
 
 def test_submit_tool_rejects_invalid_probabilities() -> None:
     tool = SubmitTool(outcomes=["Yes", "No"], board=SourceBoard())
-    output = tool.execute({"probabilities": {"Yes": 2.0}})
+    output = asyncio.run(tool.execute({"probabilities": {"Yes": 2.0}}))
 
     assert output["error"] is True
     assert "Missing probability" in output["output"]

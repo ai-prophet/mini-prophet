@@ -98,7 +98,7 @@ class SearchForecastTool:
             for sid, src in items
         }
 
-    def execute(self, args: dict) -> dict:
+    async def execute(self, args: dict) -> dict:
         query = args.get("query", "").strip()
         if not query:
             return {"output": "Error: 'query' is required for the search tool.", "error": True}
@@ -114,60 +114,7 @@ class SearchForecastTool:
 
         try:
             search_kwargs = {k: v for k, v in args.items() if k != "query"}
-            result: SearchResult = self._backend.search(
-                query,
-                limit=self._config.search_results_limit,
-                **search_kwargs,
-            )
-        except SearchAuthError:
-            raise
-        except SearchError as exc:
-            return {
-                "output": f"Search failed: {exc}. Try again or use existing sources.",
-                "error": True,
-            }
-
-        self.n_searches += 1
-        self.last_search_results = [(self._assign_source_id(src), src) for src in result.sources]
-
-        if not self.last_search_results:
-            body = "No sources found for this query."
-        else:
-            lines: list[str] = [f'<search_results count="{len(self.last_search_results)}">']
-            for sid, src in self.last_search_results:
-                date_line = f"Date: {src.date or 'No date info'}\n"
-                lines.append(
-                    f'<result id="{sid}" title="{src.title}" url="{src.url}">\n'
-                    f"{date_line}"
-                    f"Snippet: {src.snippet}\n"
-                    f"</result>"
-                )
-            lines.append("</search_results>")
-            body = "\n".join(lines)
-
-        return {
-            "output": body,
-            "search_cost": result.cost,
-            "search_results": self.last_search_results,
-        }
-
-    async def aexecute(self, args: dict) -> dict:
-        query = args.get("query", "").strip()
-        if not query:
-            return {"output": "Error: 'query' is required for the search tool.", "error": True}
-
-        if self.n_searches >= self._search_limit:
-            return {
-                "output": (
-                    f"Search limit reached ({self._search_limit} queries). "
-                    "Use your existing sources to submit a forecast."
-                ),
-                "error": True,
-            }
-
-        try:
-            search_kwargs = {k: v for k, v in args.items() if k != "query"}
-            result: SearchResult = await self._backend.asearch(
+            result: SearchResult = await self._backend.search(
                 query,
                 limit=self._config.search_results_limit,
                 **search_kwargs,

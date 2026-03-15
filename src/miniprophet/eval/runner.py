@@ -147,7 +147,7 @@ def _write_summary(args: EvalRunArgs, state: EvalRunState) -> None:
     state.summary_path.write_text(json.dumps(summary, indent=2))
 
 
-async def aprocess_problem(
+async def process_problem(
     problem: ForecastProblem,
     args: EvalRunArgs,
     state: EvalRunState,
@@ -213,7 +213,7 @@ async def aprocess_problem(
         }
 
         forecast = await asyncio.wait_for(
-            agent.arun(
+            agent.run(
                 title=problem.title,
                 outcomes=problem.outcomes,
                 ground_truth=problem.ground_truth,
@@ -285,7 +285,7 @@ async def aprocess_problem(
         _write_summary(args, state)
 
 
-async def arun_eval(
+async def run_eval(
     problems: list[ForecastProblem],
     args: EvalRunArgs,
 ) -> dict[str, RunResult]:
@@ -318,7 +318,7 @@ async def arun_eval(
                 if state.fatal_event.is_set():
                     return
                 try:
-                    done = await aprocess_problem(problem, args, state)
+                    done = await process_problem(problem, args, state)
                     if done:
                         return
                 except BatchFatalError as exc:
@@ -359,9 +359,9 @@ async def arun_eval(
     return state.results
 
 
-def run_eval(
+def run_eval_sync(
     problems: list[ForecastProblem],
     args: EvalRunArgs,
 ) -> dict[str, RunResult]:
     """Execute eval with parallel workers. Sync wrapper."""
-    return asyncio.run(arun_eval(problems, args))
+    return asyncio.run(run_eval(problems, args))

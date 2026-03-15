@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import threading
 from typing import Any
 
 logger = logging.getLogger("miniprophet.agent.eval")
@@ -29,35 +28,6 @@ class RateLimitCoordinator:
                 logger.warning("Rate limit detected -- pausing all workers for %.0fs", secs)
                 self._resume.clear()
                 asyncio.get_running_loop().call_later(secs, self._resume.set)
-
-
-# Keep the threading-based coordinator for backward compat with sync code paths
-class ThreadedRateLimitCoordinator:
-    """Shared pause/resume gate for all eval workers (threading-based, legacy)."""
-
-    def __init__(self, backoff_seconds: float = 60) -> None:
-        self._resume = threading.Event()
-        self._resume.set()
-        self._lock = threading.Lock()
-        self._backoff = backoff_seconds
-
-    def wait_if_paused(self, cancel_event: threading.Event | None = None) -> bool:
-        if cancel_event is not None and cancel_event.is_set():
-            return False
-        while not self._resume.wait(timeout=1.0):
-            if cancel_event is not None and cancel_event.is_set():
-                return False
-        return True
-
-    def signal_rate_limit(self, backoff_seconds: float | None = None) -> None:
-        secs = backoff_seconds if backoff_seconds is not None else self._backoff
-        with self._lock:
-            if self._resume.is_set():
-                logger.warning("Rate limit detected -- pausing all workers for %.0fs", secs)
-                self._resume.clear()
-                timer = threading.Timer(secs, self._resume.set)
-                timer.daemon = True
-                timer.start()
 
 
 class EvalBatchAgentWrapper:
