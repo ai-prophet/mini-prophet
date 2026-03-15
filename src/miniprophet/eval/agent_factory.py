@@ -82,8 +82,6 @@ class EvalAgentFactory:
         signature = inspect.signature(agent_cls)
         if "context_manager" in signature.parameters:
             init_kwargs["context_manager"] = context_manager
-        if "cancel_event" in signature.parameters:
-            init_kwargs["cancel_event"] = cancel_event
 
         try:
             agent = agent_cls(model=model, env=env, **init_kwargs)

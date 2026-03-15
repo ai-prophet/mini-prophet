@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import threading
 import traceback
 from datetime import UTC, datetime
 from pathlib import Path
@@ -15,7 +14,7 @@ from pydantic import BaseModel
 
 from miniprophet import ContextManager, Environment, Model, __version__
 from miniprophet.agent.trajectory import TrajectoryRecorder
-from miniprophet.exceptions import BatchRunTimeoutError, InterruptAgentFlow, LimitsExceeded
+from miniprophet.exceptions import InterruptAgentFlow, LimitsExceeded
 from miniprophet.utils.metrics import evaluate_submission, validate_ground_truth
 from miniprophet.utils.serialize import recursive_merge
 
@@ -49,12 +48,10 @@ class DefaultForecastAgent:
         env: Environment,
         *,
         context_manager: ContextManager | None = None,
-        cancel_event: threading.Event | None = None,
         config_class: type = AgentConfig,
         **kwargs,
     ) -> None:
         self.config = config_class(**kwargs)
-        self._cancel_event = cancel_event
         self.messages: list[dict] = []
         self.model = model
         self.env = env
@@ -219,9 +216,7 @@ class DefaultForecastAgent:
                 },
             )
 
-    def step(self) -> list[dict]:
-        if self._cancel_event is not None and self._cancel_event.is_set():
-            raise BatchRunTimeoutError("Run cancelled (timeout).")
+    async def step(self) -> list[dict]:
         self._prepare_messages_for_step()
         return await self.execute_actions(await self.query())
 
