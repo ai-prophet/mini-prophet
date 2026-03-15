@@ -1,6 +1,61 @@
 # Changelog
 
 
+## v0.1.10
+
+### Major: Async-first architecture
+
+Embraced async-first naming across the entire codebase. Async methods now use bare
+names (`query`, `execute`, `search`, `run`, `step`). All `a`-prefixed async variants
+(`aquery`, `aexecute`, `asearch`, `arun`, `astep`, `abatch_forecast`, `arun_eval`)
+have been removed.
+
+Only three sync wrappers remain for CLI entrypoints:
+- `DefaultForecastAgent.run_sync()` / `CliForecastAgent.run_sync()`
+- `batch_forecast_sync()`
+- `run_eval_sync()`
+
+**Breaking changes:**
+- `Model.query()` is now `async def query()`; sync `query()` removed.
+- `Tool.execute()` is now `async def execute()`; sync `execute()` and `aexecute()` removed.
+- `Environment.execute()` is now `async def execute()`; sync `execute()` and `aexecute()` removed.
+- `SearchBackend.search()` is now `async def search()`; sync `search()` and `asearch()` removed.
+- `Agent.run()` is now `async def run()`; use `run_sync()` for synchronous calls.
+- `batch_forecast()` is now `async def batch_forecast()`; use `batch_forecast_sync()` for synchronous calls.
+- `run_eval()` is now `async def run_eval()`; use `run_eval_sync()` for synchronous calls.
+- `abatch_forecast` removed from `__all__`; replaced by `batch_forecast_sync`.
+- `ThreadedRateLimitCoordinator` removed (unused legacy code).
+- Sync `retry()` removed from `models/retry.py`; `async_retry()` renamed to `retry()`.
+
+### Improved: Dead code removal
+
+- Deleted dead sync methods in `DefaultForecastAgent`: `step()`, `query()`, `execute_actions()`.
+- Deleted dead sync overrides in `CliForecastAgent`: `step()`, `query()`.
+- Removed `hasattr`/`to_thread` fallback paths in agent query and execute — async is now the only path.
+
+## v0.1.9
+
+### New: Async support for all modules
+
+- Added async variants (`astep`, `aquery`, `arun`, `asearch`, `aexecute`, `abatch_forecast`,
+  `arun_eval`) alongside existing sync methods as preparation for async-first migration.
+- Core call chain is now fully async: `run() → asyncio.run(arun()) → astep() → aquery()`.
+
+### Improved: Grace period enabled by default
+
+- Grace period is now enabled by default in agent config, giving agents extra turns to
+  submit after hitting step/cost limits.
+
+### Improved: CLI and batch mode
+
+- Updated CLI visuals and banner display.
+- Support custom searcher in batch mode.
+- Display model and searcher info after banner in CLI and eval runs.
+
+### Testing
+
+- Added comprehensive test coverage for eval, tools, and utilities.
+
 ## v0.1.8
 
 ### New: Public `batch_forecast()` API
