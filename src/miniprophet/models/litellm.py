@@ -47,13 +47,15 @@ class LitellmModel:
         self.config = LitellmModelConfig(**kwargs)
 
     # ------------------------------------------------------------------
-    # Core query
+    # Core async query
     # ------------------------------------------------------------------
 
-    def query(self, messages: list[dict], tools: list[dict]) -> dict:
-        for attempt in retry(logger=self.logger, abort_exceptions=self.abort_exceptions):
+    async def query(self, messages: list[dict], tools: list[dict]) -> dict:
+        async for attempt in retry(logger=self.logger, abort_exceptions=self.abort_exceptions):
             with attempt:
-                response = self._query(self._prepare_messages(messages), self._prepare_tools(tools))
+                response = await self._query(
+                    self._prepare_messages(messages), self._prepare_tools(tools)
+                )
 
         cost_info = self._calculate_cost(response)
         GLOBAL_MODEL_STATS.add(cost_info["cost"])
@@ -69,8 +71,8 @@ class LitellmModel:
         }
         return message
 
-    def _query(self, messages: list[dict], tools: list[dict]):
-        return litellm.completion(
+    async def _query(self, messages: list[dict], tools: list[dict]):
+        return await litellm.acompletion(
             model=self.config.model_name,
             messages=messages,
             tools=tools,

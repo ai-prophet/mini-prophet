@@ -169,7 +169,7 @@ def main(
         if search_cfg.get("search_date_after", None):
             runtime_kwargs["search_date_after"] = search_cfg["search_date_after"]
 
-        result = agent.run(
+        result = agent.run_sync(
             title=resolved_title, outcomes=outcome_list, ground_truth=ground_truth, **runtime_kwargs
         )
 

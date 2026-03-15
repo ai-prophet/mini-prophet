@@ -14,7 +14,7 @@ from miniprophet.cli.components.banner import print_cli_banner, print_run_info
 from miniprophet.cli.utils import get_console
 from miniprophet.eval.datasets.loader import DatasetSourceKind, resolve_dataset_to_jsonl
 from miniprophet.eval.datasets.validate import load_problems
-from miniprophet.eval.runner import EvalRunArgs, load_existing_summary, run_eval
+from miniprophet.eval.runner import EvalRunArgs, load_existing_summary, run_eval_sync
 from miniprophet.exceptions import BatchFatalError
 from miniprophet.utils.serialize import UNSET, recursive_merge
 
@@ -330,7 +330,7 @@ def main(
     )
 
     try:
-        results = run_eval(problems, run_args)
+        results = run_eval_sync(problems, run_args)
     except BatchFatalError as exc:
         console.print(f"\n[bold red]Eval aborted:[/bold red] {exc}")
         raise typer.Exit(1) from exc

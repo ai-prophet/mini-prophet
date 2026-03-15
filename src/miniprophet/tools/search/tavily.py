@@ -70,8 +70,14 @@ class TavilySearchBackend:
         self._country = country
         self._timeout = timeout
         self._client = TavilyClient(api_key=self._api_key)
+        self._async_client = None
 
-    def search(self, query: str, limit: int = 5, **kwargs: Any) -> SearchResult:
+    async def search(self, query: str, limit: int = 5, **kwargs: Any) -> SearchResult:
+        if self._async_client is None:
+            from tavily import AsyncTavilyClient
+
+            self._async_client = AsyncTavilyClient(api_key=self._api_key)
+
         payload: dict[str, Any] = {
             "query": query,
             "max_results": min(limit, 20),
@@ -85,7 +91,6 @@ class TavilySearchBackend:
             "timeout": self._timeout,
         }
 
-        # Handle runtime date filters (MM/DD/YYYY -> YYYY-MM-DD)
         search_date_after = kwargs.pop("search_date_after", None)
         search_date_before = kwargs.pop("search_date_before", None)
         payload.update(kwargs)
@@ -98,7 +103,7 @@ class TavilySearchBackend:
         payload = {k: v for k, v in payload.items() if v is not None}
 
         try:
-            resp = self._client.search(**payload)
+            resp = await self._async_client.search(**payload)
         except (InvalidAPIKeyError, MissingAPIKeyError) as exc:
             raise SearchAuthError(
                 "Tavily API authentication failed. Check TAVILY_API_KEY."
@@ -132,7 +137,7 @@ class TavilySearchBackend:
             sources.append(Source(url=url, title=title, snippet=snippet, date=date))
 
         cost = self._extract_cost(resp)
-        logger.info(f"Tavily search '{query}': {len(sources)} source(s), cost={cost}")
+        logger.info(f"Tavily async search '{query}': {len(sources)} source(s), cost={cost}")
         return SearchResult(sources=sources, cost=cost)
 
     @staticmethod

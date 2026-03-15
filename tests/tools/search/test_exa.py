@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import types
 from typing import Any
 
@@ -36,7 +37,7 @@ class _FakeExaClient:
         self._raise: Exception | None = None
         self.last_payload: dict = {}
 
-    def search(self, **kwargs) -> Any:
+    async def search(self, **kwargs) -> Any:
         self.last_payload = kwargs
         if self._raise is not None:
             raise self._raise
@@ -67,6 +68,7 @@ def backend_and_client(monkeypatch: pytest.MonkeyPatch) -> tuple[ExaSearchBacken
     fake_client = _FakeExaClient()
     monkeypatch.setattr("miniprophet.tools.search.exa.Exa", lambda api_key: fake_client)
     backend = ExaSearchBackend()
+    backend._async_client = fake_client
     return backend, fake_client
 
 
@@ -93,7 +95,7 @@ class TestExaSearch:
             cost_dollars=types.SimpleNamespace(total=0.05),
         )
 
-        result = backend.search("test query", limit=5)
+        result = asyncio.run(backend.search("test query", limit=5))
         assert len(result.sources) == 2
         assert result.sources[0].url == "https://example.com"
         assert result.cost == pytest.approx(0.05)
@@ -107,7 +109,7 @@ class TestExaSearch:
             cost_dollars=None,
         )
 
-        result = backend.search("query")
+        result = asyncio.run(backend.search("query"))
         assert len(result.sources) == 1
         assert result.sources[0].url == "https://valid.com"
         assert result.cost == 0.0
@@ -118,7 +120,9 @@ class TestExaSearch:
         backend, client = backend_and_client
         client._response = types.SimpleNamespace(results=[], cost_dollars=None)
 
-        backend.search("test", search_date_after="01/01/2026", search_date_before="03/01/2026")
+        asyncio.run(
+            backend.search("test", search_date_after="01/01/2026", search_date_before="03/01/2026")
+        )
         assert client.last_payload["start_published_date"] == "2026-01-01T00:00:00Z"
         assert client.last_payload["end_published_date"] == "2026-03-01T23:59:59Z"
 
@@ -141,7 +145,7 @@ class TestExaSearch:
         exc.status_code = status_code  # type: ignore[attr-defined]
         client._raise = exc
         with pytest.raises(exc_type, match=match):
-            backend.search("test")
+            asyncio.run(backend.search("test"))
 
     def test_generic_error_raises_network_error(
         self, backend_and_client: tuple[ExaSearchBackend, _FakeExaClient]
@@ -149,7 +153,7 @@ class TestExaSearch:
         backend, client = backend_and_client
         client._raise = RuntimeError("connection failed")
         with pytest.raises(SearchNetworkError, match="request failed"):
-            backend.search("test")
+            asyncio.run(backend.search("test"))
 
 
 class TestExaSnippetExtraction:

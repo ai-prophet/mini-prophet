@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 import time
@@ -52,14 +51,14 @@ class OpenRouterModel:
         self._api_key = os.getenv("OPENROUTER_API_KEY", "")
 
     # ------------------------------------------------------------------
-    # Core query
+    # Async core query
     # ------------------------------------------------------------------
 
-    def query(self, messages: list[dict], tools: list[dict]) -> dict:
+    async def query(self, messages: list[dict], tools: list[dict]) -> dict:
         prepared = [{k: v for k, v in msg.items() if k != "extra"} for msg in messages]
-        for attempt in retry(logger=logger, abort_exceptions=self.abort_exceptions):
+        async for attempt in retry(logger=logger, abort_exceptions=self.abort_exceptions):
             with attempt:
-                response = self._query(prepared, tools)
+                response = await self._query(prepared, tools)
 
         cost_info = self._calculate_cost(response)
         GLOBAL_MODEL_STATS.add(cost_info["cost"])
@@ -75,7 +74,9 @@ class OpenRouterModel:
         }
         return message
 
-    def _query(self, messages: list[dict], tools: list[dict]) -> dict:
+    async def _query(self, messages: list[dict], tools: list[dict]) -> dict:
+        import httpx
+
         headers = {
             "Authorization": f"Bearer {self._api_key}",
             "Content-Type": "application/json",
@@ -89,23 +90,25 @@ class OpenRouterModel:
         }
 
         try:
-            resp = requests.post(
-                self._api_url,
-                headers=headers,
-                data=json.dumps(payload),
-                timeout=120,
-            )
-            resp.raise_for_status()
-            return resp.json()
-        except requests.exceptions.HTTPError:
-            if resp.status_code == 401:
+            async with httpx.AsyncClient() as client:
+                resp = await client.post(
+                    self._api_url,
+                    headers=headers,
+                    json=payload,
+                    timeout=120,
+                )
+                resp.raise_for_status()
+                return resp.json()
+        except httpx.HTTPStatusError as exc:
+            status_code = exc.response.status_code
+            if status_code == 401:
                 raise OpenRouterAuthenticationError(
                     "Authentication failed. Check OPENROUTER_API_KEY."
                 )
-            if resp.status_code == 429:
+            if status_code == 429:
                 raise OpenRouterRateLimitError("Rate limit exceeded")
-            raise OpenRouterAPIError(f"HTTP {resp.status_code}: {resp.text[:300]}")
-        except requests.exceptions.RequestException as exc:
+            raise OpenRouterAPIError(f"HTTP {status_code}: {exc.response.text[:300]}")
+        except httpx.RequestError as exc:
             raise OpenRouterAPIError(f"Request failed: {exc}") from exc
 
     # ------------------------------------------------------------------

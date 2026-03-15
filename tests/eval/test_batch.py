@@ -11,15 +11,14 @@ from miniprophet.eval.batch import (
     _is_auth_error,
     _is_rate_limit_error,
     _load_config,
-    _run_agent_with_timeout,
-    batch_forecast,
+    batch_forecast_sync,
 )
 from miniprophet.eval.types import (
     BatchProgressCallback,
     ForecastProblem,
     ForecastResult,
 )
-from miniprophet.exceptions import BatchRunTimeoutError, SearchRateLimitError
+from miniprophet.exceptions import SearchRateLimitError
 
 
 class _SimpleAgent:
@@ -33,14 +32,21 @@ class _SimpleAgent:
         self.total_cost = 0.15
         self.n_calls = 1
 
-    def step(self) -> list[dict]:
+    async def step(self) -> list[dict]:
         return [{"role": "tool", "content": "ok"}]
 
-    def run(self, *, title: str, outcomes: list[str], ground_truth: Any = None, **kw: Any) -> dict:
+    async def run(
+        self, *, title: str, outcomes: list[str], ground_truth: Any = None, **kw: Any
+    ) -> dict:
         return {
             "exit_status": "submitted",
             "submission": {o: 1.0 / len(outcomes) for o in outcomes},
         }
+
+    def run_sync(self, **kw: Any) -> dict:
+        import asyncio
+
+        return asyncio.run(self.run(**kw))
 
     def save(self, path: Any, *extra: Any) -> dict:
         return {}
@@ -107,7 +113,7 @@ def test_batch_forecast_with_agent_class(
     mock_get_search.return_value = MagicMock()
 
     problems = _make_problems(2)
-    results = batch_forecast(
+    results = batch_forecast_sync(
         problems,
         config={"model": {"model_name": "test/m"}},
         agent_class=_SimpleAgent,
@@ -133,7 +139,7 @@ def test_batch_forecast_with_progress_callback(
 
     tracker = _ProgressTracker()
     problems = _make_problems(1)
-    results = batch_forecast(
+    results = batch_forecast_sync(
         problems,
         config={"model": {"model_name": "test/m"}},
         agent_class=_SimpleAgent,
@@ -156,7 +162,7 @@ def test_batch_forecast_preserves_order(
     mock_get_search.return_value = MagicMock()
 
     problems = _make_problems(5)
-    results = batch_forecast(
+    results = batch_forecast_sync(
         problems,
         config={"model": {"model_name": "test/m"}},
         agent_class=_SimpleAgent,
@@ -176,10 +182,10 @@ class _FailAgent:
         self.total_cost = 0.0
         self.n_calls = 0
 
-    def step(self) -> list[dict]:
+    async def step(self) -> list[dict]:
         return []
 
-    def run(self, **kw: Any) -> dict:
+    async def run(self, **kw: Any) -> dict:
         raise RuntimeError("Something went wrong")
 
 
@@ -192,7 +198,7 @@ def test_batch_forecast_handles_agent_errors(
     mock_get_search.return_value = MagicMock()
 
     problems = _make_problems(1)
-    results = batch_forecast(
+    results = batch_forecast_sync(
         problems,
         config={"model": {"model_name": "test/m"}},
         agent_class=_FailAgent,
@@ -212,7 +218,7 @@ def test_batch_forecast_cost_limit(mock_get_model: MagicMock, mock_get_search: M
 
     # First run costs 0.15, so second should be skipped with a 0.10 limit
     problems = _make_problems(2)
-    results = batch_forecast(
+    results = batch_forecast_sync(
         problems,
         config={"model": {"model_name": "test/m"}},
         agent_class=_SimpleAgent,
@@ -264,47 +270,6 @@ def test_load_config_invalid_type_raises() -> None:
         _load_config(42)  # type: ignore[arg-type]
 
 
-class TestRunAgentWithTimeout:
-    def test_no_timeout(self) -> None:
-        class Agent:
-            def run(self, **kw):
-                return {"exit_status": "done"}
-
-        import threading
-
-        result = _run_agent_with_timeout(
-            agent=Agent(),
-            timeout_seconds=0,
-            cancel_event=threading.Event(),
-            title="t",
-            outcomes=["A"],
-            ground_truth=None,
-            runtime_kwargs={},
-        )
-        assert result == {"exit_status": "done"}
-
-    def test_timeout_fires(self) -> None:
-        import threading
-
-        cancel_event = threading.Event()
-        cancel_event.set()  # Pre-set to simulate timeout
-
-        class Agent:
-            def run(self, **kw):
-                return {}
-
-        with pytest.raises(BatchRunTimeoutError):
-            _run_agent_with_timeout(
-                agent=Agent(),
-                timeout_seconds=1,
-                cancel_event=cancel_event,
-                title="t",
-                outcomes=["A"],
-                ground_truth=None,
-                runtime_kwargs={},
-            )
-
-
 @patch("miniprophet.tools.search.get_search_backend")
 def test_batch_forecast_with_prebuilt_model(mock_get_search: MagicMock) -> None:
     mock_get_search.return_value = MagicMock()
@@ -313,7 +278,7 @@ def test_batch_forecast_with_prebuilt_model(mock_get_search: MagicMock) -> None:
         class config:
             model_name = "fake"
 
-        def query(self, *a, **kw):
+        async def query(self, *a, **kw):
             return {}
 
         def format_message(self, **kw):
@@ -326,7 +291,7 @@ def test_batch_forecast_with_prebuilt_model(mock_get_search: MagicMock) -> None:
             return {"info": {"config": {"model": {}}}}
 
     problems = _make_problems(1)
-    results = batch_forecast(
+    results = batch_forecast_sync(
         problems,
         config={"model": {"model_name": "test/m"}},
         agent_class=_SimpleAgent,

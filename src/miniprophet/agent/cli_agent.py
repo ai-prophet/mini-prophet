@@ -165,7 +165,7 @@ class CliForecastAgent(DefaultForecastAgent):
     # Override run to install/restore signal handler
     # ------------------------------------------------------------------
 
-    def run(
+    async def run(
         self,
         title: str,
         outcomes: list[str],
@@ -177,7 +177,7 @@ class CliForecastAgent(DefaultForecastAgent):
             self._original_sigint_handler = signal.getsignal(signal.SIGINT)
             signal.signal(signal.SIGINT, self._handle_sigint)
         try:
-            return super().run(title, outcomes, ground_truth, **runtime_kwargs)
+            return await super().run(title, outcomes, ground_truth, **runtime_kwargs)
         finally:
             if self._original_sigint_handler is not None:
                 signal.signal(signal.SIGINT, self._original_sigint_handler)
@@ -187,10 +187,10 @@ class CliForecastAgent(DefaultForecastAgent):
     # Override step: interrupt check points + context truncation display
     # ------------------------------------------------------------------
 
-    def step(self) -> list[dict]:
+    async def step(self) -> list[dict]:
         self._prepare_messages_for_step()
 
-        message = self.query()
+        message = await self.query()
 
         has_actions = bool(message.get("extra", {}).get("actions", []))
 
@@ -202,7 +202,7 @@ class CliForecastAgent(DefaultForecastAgent):
             return list(self.messages)
 
         # Execute tool actions
-        result = self.execute_actions(message)
+        result = await self.execute_actions(message)
 
         # Interrupt after tool execution: A -> B -> C
         if self._interrupt_requested:
@@ -217,8 +217,8 @@ class CliForecastAgent(DefaultForecastAgent):
     # Override query to show a spinner while waiting for the model
     # ------------------------------------------------------------------
 
-    def query(self) -> dict:
+    async def query(self) -> dict:
         model_name = getattr(self.model.config, "model_name", "model")
         spinner = Spinner("dots", text=f"  {model_name} is forecasting...")
         with Live(spinner, console=console, transient=True):
-            return super().query()
+            return await super().query()

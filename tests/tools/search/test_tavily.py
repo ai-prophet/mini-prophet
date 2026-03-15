@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 import pytest
@@ -16,7 +17,7 @@ class _FakeTavilyClient:
         self._raise: Exception | None = None
         self.last_payload: dict = {}
 
-    def search(self, **kwargs: Any) -> dict:
+    async def search(self, **kwargs: Any) -> dict:
         self.last_payload = kwargs
         if self._raise is not None:
             raise self._raise
@@ -50,6 +51,7 @@ def backend_and_client(
         lambda api_key: fake_client,
     )
     backend = TavilySearchBackend()
+    backend._async_client = fake_client
     return backend, fake_client
 
 
@@ -87,7 +89,7 @@ class TestTavilySearch:
             "usage": {"credits": 1},
         }
 
-        result = backend.search("test query", limit=5)
+        result = asyncio.run(backend.search("test query", limit=5))
         assert len(result.sources) == 2
         assert result.sources[0].url == "https://example.com"
         assert result.sources[0].title == "Title"
@@ -103,7 +105,7 @@ class TestTavilySearch:
             "results": [_make_result(url=""), _make_result(url="https://valid.com")],
         }
 
-        result = backend.search("query")
+        result = asyncio.run(backend.search("query"))
         assert len(result.sources) == 1
         assert result.sources[0].url == "https://valid.com"
 
@@ -113,7 +115,9 @@ class TestTavilySearch:
         backend, client = backend_and_client
         client._response = {"results": []}
 
-        backend.search("test", search_date_after="01/01/2026", search_date_before="03/01/2026")
+        asyncio.run(
+            backend.search("test", search_date_after="01/01/2026", search_date_before="03/01/2026")
+        )
         assert client.last_payload["start_date"] == "2026-01-01"
         assert client.last_payload["end_date"] == "2026-03-01"
 
@@ -123,7 +127,7 @@ class TestTavilySearch:
         backend, client = backend_and_client
         client._response = {"results": []}
 
-        backend.search("test", time_range="week")
+        asyncio.run(backend.search("test", time_range="week"))
         assert client.last_payload["time_range"] == "week"
 
     def test_invalid_date_raises_network_error(
@@ -131,7 +135,7 @@ class TestTavilySearch:
     ) -> None:
         backend, client = backend_and_client
         with pytest.raises(SearchNetworkError, match="Expected MM/DD/YYYY"):
-            backend.search("test", search_date_after="2026-01-01")
+            asyncio.run(backend.search("test", search_date_after="2026-01-01"))
 
     def test_invalid_api_key_raises_auth_error(
         self, backend_and_client: tuple[TavilySearchBackend, _FakeTavilyClient]
@@ -142,7 +146,7 @@ class TestTavilySearch:
         client._raise = InvalidAPIKeyError("invalid key")
 
         with pytest.raises(SearchAuthError, match="authentication failed"):
-            backend.search("test")
+            asyncio.run(backend.search("test"))
 
     def test_missing_key_exception_raises_auth_error(
         self, backend_and_client: tuple[TavilySearchBackend, _FakeTavilyClient]
@@ -153,7 +157,7 @@ class TestTavilySearch:
         client._raise = MissingAPIKeyError()
 
         with pytest.raises(SearchAuthError, match="authentication failed"):
-            backend.search("test")
+            asyncio.run(backend.search("test"))
 
     def test_usage_limit_raises_rate_limit_error(
         self, backend_and_client: tuple[TavilySearchBackend, _FakeTavilyClient]
@@ -164,7 +168,7 @@ class TestTavilySearch:
         client._raise = UsageLimitExceededError("limit exceeded")
 
         with pytest.raises(SearchRateLimitError, match="usage limit"):
-            backend.search("test")
+            asyncio.run(backend.search("test"))
 
     @pytest.mark.parametrize(
         "status_code,exc_type,match",
@@ -185,7 +189,7 @@ class TestTavilySearch:
         exc.status_code = status_code  # type: ignore[attr-defined]
         client._raise = exc
         with pytest.raises(exc_type, match=match):
-            backend.search("test")
+            asyncio.run(backend.search("test"))
 
     def test_generic_error_raises_network_error(
         self, backend_and_client: tuple[TavilySearchBackend, _FakeTavilyClient]
@@ -193,7 +197,7 @@ class TestTavilySearch:
         backend, client = backend_and_client
         client._raise = RuntimeError("connection failed")
         with pytest.raises(SearchNetworkError, match="request failed"):
-            backend.search("test")
+            asyncio.run(backend.search("test"))
 
     def test_content_truncated_to_max_characters(
         self, backend_and_client: tuple[TavilySearchBackend, _FakeTavilyClient]
@@ -204,7 +208,7 @@ class TestTavilySearch:
             "results": [_make_result(content="a" * 100)],
         }
 
-        result = backend.search("test")
+        result = asyncio.run(backend.search("test"))
         assert len(result.sources[0].snippet) == 10
 
     def test_payload_includes_expected_defaults(
@@ -213,7 +217,7 @@ class TestTavilySearch:
         backend, client = backend_and_client
         client._response = {"results": []}
 
-        backend.search("test query", limit=3)
+        asyncio.run(backend.search("test query", limit=3))
         p = client.last_payload
         assert p["query"] == "test query"
         assert p["max_results"] == 3

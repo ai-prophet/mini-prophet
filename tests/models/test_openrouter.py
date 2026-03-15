@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 import json
 
 import pytest
-import requests
 
 from miniprophet.exceptions import FormatError
 from miniprophet.models.openrouter import (
@@ -84,14 +84,22 @@ def test_openrouter_format_observation_messages_tool_and_user_roles() -> None:
     assert "<error>" in msgs[1]["content"]
 
 
-def _mock_response(status_code: int = 200, json_data: dict | None = None):
-    resp = requests.models.Response()
-    resp.status_code = status_code
-    if json_data is not None:
-        resp._content = json.dumps(json_data).encode()
-    else:
-        resp._content = b"error text"
-    return resp
+class _FakeHttpxResponse:
+    def __init__(self, status_code: int, json_data: dict | None = None):
+        self.status_code = status_code
+        self._json_data = json_data
+        self.text = json.dumps(json_data) if json_data else "error text"
+
+    def json(self):
+        return self._json_data
+
+    def raise_for_status(self):
+        import httpx
+
+        if self.status_code >= 400:
+            request = httpx.Request("POST", "https://openrouter.ai/api/v1/chat/completions")
+            response = httpx.Response(self.status_code, text=self.text, request=request)
+            raise httpx.HTTPStatusError("error", request=request, response=response)
 
 
 @pytest.mark.parametrize(
@@ -103,23 +111,32 @@ def _mock_response(status_code: int = 200, json_data: dict | None = None):
     ],
 )
 def test_openrouter_query_http_errors(monkeypatch, status_code: int, exc_type: type) -> None:
+    import httpx
+
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
     m = OpenRouterModel(model_name="test/model", cost_tracking="ignore_errors")
-    resp = _mock_response(status_code)
-    monkeypatch.setattr("miniprophet.models.openrouter.requests.post", lambda *a, **kw: resp)
+
+    async def fake_post(self, url, **kwargs):
+        resp = _FakeHttpxResponse(status_code)
+        resp.raise_for_status()
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", fake_post)
     with pytest.raises(exc_type):
-        m._query([], [])
+        asyncio.run(m._query([], []))
 
 
 def test_openrouter_query_connection_error(monkeypatch) -> None:
+    import httpx
+
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
     m = OpenRouterModel(model_name="test/model", cost_tracking="ignore_errors")
-    monkeypatch.setattr(
-        "miniprophet.models.openrouter.requests.post",
-        lambda *a, **kw: (_ for _ in ()).throw(requests.exceptions.ConnectionError("refused")),
-    )
+
+    async def fake_post(self, url, **kwargs):
+        raise httpx.RequestError("connection refused")
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", fake_post)
     with pytest.raises(OpenRouterAPIError, match="Request failed"):
-        m._query([], [])
+        asyncio.run(m._query([], []))
 
 
 def test_openrouter_extract_usage_with_none_values() -> None:
@@ -144,11 +161,17 @@ def test_openrouter_serialize() -> None:
 
 
 def test_openrouter_get_max_context_tokens_returns_none_on_failure(monkeypatch) -> None:
+    import requests
+
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
     m = OpenRouterModel(model_name="nonexistent/model", cost_tracking="ignore_errors")
+
+    resp = requests.models.Response()
+    resp.status_code = 500
+    resp._content = b"error text"
     monkeypatch.setattr(
         "miniprophet.models.openrouter.requests.get",
-        lambda *a, **kw: _mock_response(500),
+        lambda *a, **kw: resp,
     )
     result = m.get_max_context_tokens()
     assert result is None or isinstance(result, int)

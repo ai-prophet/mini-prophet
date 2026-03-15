@@ -98,7 +98,7 @@ class SearchForecastTool:
             for sid, src in items
         }
 
-    def execute(self, args: dict) -> dict:
+    async def execute(self, args: dict) -> dict:
         query = args.get("query", "").strip()
         if not query:
             return {"output": "Error: 'query' is required for the search tool.", "error": True}
@@ -114,7 +114,7 @@ class SearchForecastTool:
 
         try:
             search_kwargs = {k: v for k, v in args.items() if k != "query"}
-            result: SearchResult = self._backend.search(
+            result: SearchResult = await self._backend.search(
                 query,
                 limit=self._config.search_results_limit,
                 **search_kwargs,

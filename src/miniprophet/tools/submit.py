@@ -45,7 +45,10 @@ class SubmitTool:
     def get_schema(self) -> dict:
         return SUBMIT_SCHEMA
 
-    def execute(self, args: dict) -> dict:
+    async def execute(self, args: dict) -> dict:
+        return self._execute_impl(args)
+
+    def _execute_impl(self, args: dict) -> dict:
         probabilities = args.get("probabilities")
         if not isinstance(probabilities, dict):
             return {

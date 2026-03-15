@@ -35,7 +35,7 @@ for r in results:
 ## `batch_forecast` signature
 
 ```python
-def batch_forecast(
+async def batch_forecast(
     problems: list[ForecastProblem],
     config: dict | str | Path | None = None,
     *,
@@ -54,11 +54,13 @@ def batch_forecast(
 ) -> list[ForecastResult]:
 ```
 
+For synchronous usage, use `batch_forecast_sync()` or `asyncio.run(batch_forecast(...))`.
+
 | Parameter | Description |
 | --- | --- |
 | `problems` | List of `ForecastProblem` instances to solve |
 | `config` | Config dict, path to a YAML file, or `None` for defaults |
-| `workers` | Number of parallel worker threads |
+| `workers` | Number of parallel async workers |
 | `timeout_seconds` | Per-problem timeout (0 = unlimited) |
 | `max_total_cost` | Stop when cumulative cost exceeds this (0 = unlimited) |
 | `search_date_before` | Restrict searches to before this date (`MM/DD/YYYY`) |
@@ -150,7 +152,7 @@ class MyForecastAgent:
     def __init__(self, model, env, **kwargs):
         ...
 
-    def run(self, title, outcomes, ground_truth=None, **runtime_kwargs) -> dict:
+    async def run(self, title, outcomes, ground_truth=None, **runtime_kwargs) -> dict:
         # Must return a dict with at least "exit_status"
         # Optionally include "submission" and "evaluation"
         ...

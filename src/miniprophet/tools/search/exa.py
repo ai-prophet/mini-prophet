@@ -65,8 +65,14 @@ class ExaSearchBackend:
         self._search_type = search_type
         self._category = category
         self._client = Exa(api_key=self._api_key)
+        self._async_client = None
 
-    def search(self, query: str, limit: int = 5, **kwargs: Any) -> SearchResult:
+    async def search(self, query: str, limit: int = 5, **kwargs: Any) -> SearchResult:
+        if self._async_client is None:
+            from exa_py import AsyncExa
+
+            self._async_client = AsyncExa(api_key=self._api_key)
+
         payload: dict[str, Any] = {
             "query": query,
             "num_results": min(limit, 100),
@@ -79,7 +85,6 @@ class ExaSearchBackend:
         search_date_before = kwargs.pop("search_date_before", None)
         search_date_after = kwargs.pop("search_date_after", None)
         payload.update(kwargs)
-        # This would effectively override the `start_published_date` set by the model itself
         if search_date_after:
             payload["start_published_date"] = self._date_mmddyyyy_to_iso(
                 search_date_after, end_of_day=False
@@ -92,7 +97,7 @@ class ExaSearchBackend:
         payload = {k: v for k, v in payload.items() if v is not None}
 
         try:
-            resp = self._client.search(**payload)
+            resp = await self._async_client.search(**payload)
         except Exception as exc:
             status_code = getattr(exc, "status_code", None)
             if status_code is None:
@@ -116,7 +121,7 @@ class ExaSearchBackend:
 
             sources.append(Source(url=url, title=title, snippet=snippet, date=date))
 
-        logger.info(f"Exa search '{query}': {len(sources)} source(s)")
+        logger.info(f"Exa async search '{query}': {len(sources)} source(s)")
         return SearchResult(sources=sources, cost=self._extract_cost(resp))
 
     def _build_contents_payload(self) -> dict[str, Any]:

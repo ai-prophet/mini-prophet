@@ -32,24 +32,18 @@ class TestResolveAgentClass:
         class MyAgent:
             pass
 
-        result = EvalAgentFactory._resolve_agent_class(
-            agent_name=None, agent_class=MyAgent
-        )
+        result = EvalAgentFactory._resolve_agent_class(agent_name=None, agent_class=MyAgent)
         assert result is MyAgent
 
     def test_default_agent_resolved(self) -> None:
-        result = EvalAgentFactory._resolve_agent_class(
-            agent_name="default", agent_class=None
-        )
+        result = EvalAgentFactory._resolve_agent_class(agent_name="default", agent_class=None)
         from miniprophet.agent.default import DefaultForecastAgent
 
         assert result is DefaultForecastAgent
 
     def test_unknown_agent_name_raises(self) -> None:
         with pytest.raises(ValueError, match="Unknown built-in"):
-            EvalAgentFactory._resolve_agent_class(
-                agent_name="nonexistent", agent_class=None
-            )
+            EvalAgentFactory._resolve_agent_class(agent_name="nonexistent", agent_class=None)
 
 
 class TestCreate:
@@ -85,25 +79,3 @@ class TestCreate:
             task_id="t1",
         )
         assert received["cm"] is sentinel
-
-    def test_cancel_event_injected_when_accepted(self) -> None:
-        """cancel_event should be passed to agent constructors that accept it."""
-        import threading
-
-        received = {}
-
-        class AgentWithCancel:
-            def __init__(self, model, env, cancel_event=None):
-                received["ce"] = cancel_event
-
-        cancel = threading.Event()
-        EvalAgentFactory.create(
-            model=object(),
-            env=object(),
-            context_manager=None,
-            agent_class=AgentWithCancel,
-            agent_kwargs={},
-            task_id="t1",
-            cancel_event=cancel,
-        )
-        assert received["ce"] is cancel

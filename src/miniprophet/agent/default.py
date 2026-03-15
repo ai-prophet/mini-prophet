@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
-import threading
 import traceback
 from datetime import UTC, datetime
 from pathlib import Path
@@ -14,7 +14,7 @@ from pydantic import BaseModel
 
 from miniprophet import ContextManager, Environment, Model, __version__
 from miniprophet.agent.trajectory import TrajectoryRecorder
-from miniprophet.exceptions import BatchRunTimeoutError, InterruptAgentFlow, LimitsExceeded
+from miniprophet.exceptions import InterruptAgentFlow, LimitsExceeded
 from miniprophet.utils.metrics import evaluate_submission, validate_ground_truth
 from miniprophet.utils.serialize import recursive_merge
 
@@ -48,12 +48,10 @@ class DefaultForecastAgent:
         env: Environment,
         *,
         context_manager: ContextManager | None = None,
-        cancel_event: threading.Event | None = None,
         config_class: type = AgentConfig,
         **kwargs,
     ) -> None:
         self.config = config_class(**kwargs)
-        self._cancel_event = cancel_event
         self.messages: list[dict] = []
         self.model = model
         self.env = env
@@ -119,7 +117,16 @@ class DefaultForecastAgent:
         pass
 
     # Core loop
-    def run(
+    def run_sync(
+        self,
+        title: str,
+        outcomes: list[str],
+        ground_truth: dict[str, int] | None = None,
+        **runtime_kwargs,
+    ) -> ForecastResult:
+        return asyncio.run(self.run(title, outcomes, ground_truth, **runtime_kwargs))
+
+    async def run(
         self,
         title: str,
         outcomes: list[str],
@@ -165,7 +172,7 @@ class DefaultForecastAgent:
 
         while True:
             try:
-                self.step()
+                await self.step()
             except InterruptAgentFlow as exc:
                 self.add_messages(*exc.messages)
             except Exception as exc:
@@ -209,13 +216,11 @@ class DefaultForecastAgent:
                 },
             )
 
-    def step(self) -> list[dict]:
-        if self._cancel_event is not None and self._cancel_event.is_set():
-            raise BatchRunTimeoutError("Run cancelled (timeout).")
+    async def step(self) -> list[dict]:
         self._prepare_messages_for_step()
-        return self.execute_actions(self.query())
+        return await self.execute_actions(await self.query())
 
-    def query(self) -> dict:
+    async def query(self) -> dict:
         step_limit_hit = 0 < self.config.step_limit <= self.n_calls
         cost_limit_hit = 0 < self.config.cost_limit <= self.total_cost
 
@@ -251,10 +256,9 @@ class DefaultForecastAgent:
                 )
 
         self.n_calls += 1
-        # Snapshot the messages the model will actually see (post-truncation, post-board inject)
         input_snapshot = list(self.messages)
         tools = self.env.get_tool_schemas()
-        message = self.model.query(self.messages, tools)
+        message = await self.model.query(self.messages, tools)
         extra = message.get("extra", {})
         self.model_cost += extra.get("cost", 0.0)
         self.prompt_tokens = extra.get("prompt_tokens", self.prompt_tokens)
@@ -266,7 +270,7 @@ class DefaultForecastAgent:
         self.on_model_response(message)
         return message
 
-    def execute_actions(self, message: dict) -> list[dict]:
+    async def execute_actions(self, message: dict) -> list[dict]:
         actions = message.get("extra", {}).get("actions", [])
         outputs: list[dict] = []
         for action in actions:
@@ -278,7 +282,7 @@ class DefaultForecastAgent:
                     }
                 )
             else:
-                outputs.append(self.env.execute(action, **self.runtime_kwargs))
+                outputs.append(await self.env.execute(action, **self.runtime_kwargs))
         for action, output in zip(actions, outputs):
             sc = output.get("search_cost", 0.0)
             if sc:

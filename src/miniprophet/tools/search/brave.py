@@ -6,6 +6,7 @@ in snippets/brave_search.py.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from typing import Any
@@ -58,7 +59,7 @@ class BraveSearchBackend:
         self._max_retries = max_retries
         self._max_extract_chars = max_extract_chars
 
-    def search(self, query: str, limit: int = 5, **kwargs: Any) -> SearchResult:
+    def _search_sync(self, query: str, limit: int = 5, **kwargs: Any) -> SearchResult:
         if "search_date_before" in kwargs or "search_date_after" in kwargs:
             kwargs.pop("search_date_before", None)
             kwargs.pop("search_date_after", None)
@@ -80,6 +81,9 @@ class BraveSearchBackend:
                 )
         logger.info(f"Search '{query}': {len(sources)}/{len(links)} sources extracted")
         return SearchResult(sources=sources, cost=0.0)
+
+    async def search(self, query: str, limit: int = 5, **kwargs: Any) -> SearchResult:
+        return await asyncio.to_thread(self._search_sync, query, limit, **kwargs)
 
     def _get_links(
         self, query: str, limit: int, freshness: Any | None = None

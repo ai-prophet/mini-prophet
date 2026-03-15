@@ -17,7 +17,8 @@ Main extension interfaces are Protocol-based and live in `src/miniprophet/__init
 
 ## 1. Custom search backend
 
-Implement the `SearchBackend` protocol (`search`, `serialize`).
+Implement the `SearchBackend` protocol (`search`, `serialize`). The `search` method
+must be `async`.
 
 ```python
 from miniprophet.environment.source_board import Source
@@ -34,7 +35,7 @@ class MySearchBackend:
         "required": ["query"],
     }
 
-    def search(self, query: str, limit: int = 5, **kwargs) -> SearchResult:
+    async def search(self, query: str, limit: int = 5, **kwargs) -> SearchResult:
         sources = [
             Source(url="https://example.com", title="Example", snippet="...", date="2026-01-01")
         ]
@@ -66,7 +67,7 @@ A tool must implement:
 
 - `name`
 - `get_schema()`
-- `execute(args)`
+- `execute(args)` (async)
 - `display(output)`
 
 ```python
@@ -89,7 +90,7 @@ class MyTool:
             },
         }
 
-    def execute(self, args: dict) -> dict:
+    async def execute(self, args: dict) -> dict:
         return {"output": f"ok: {args['x']}"}
 
     def display(self, output: dict) -> None:
@@ -124,7 +125,7 @@ Pass it into the agent constructor as `context_manager=...`.
 
 ## 4. Custom model
 
-Implement the `Model` protocol (`query`, message formatting helpers, `serialize`).
+Implement the `Model` protocol (`async query`, message formatting helpers, `serialize`).
 
 In practice, the easiest route is using `LitellmModel` with `--model-class litellm`.
 

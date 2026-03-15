@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import importlib
 import inspect
-import threading
 from typing import Any
 
 from miniprophet import ContextManager, Environment, Model
@@ -73,7 +72,6 @@ class EvalAgentFactory:
         task_id: str,
         coordinator: RateLimitCoordinator | None = None,
         progress_manager: Any | None = None,
-        cancel_event: threading.Event | None = None,
     ) -> EvalBatchAgentWrapper:
         agent_cls = cls._resolve_agent_class(
             agent_name=agent_name,
@@ -84,8 +82,6 @@ class EvalAgentFactory:
         signature = inspect.signature(agent_cls)
         if "context_manager" in signature.parameters:
             init_kwargs["context_manager"] = context_manager
-        if "cancel_event" in signature.parameters:
-            init_kwargs["cancel_event"] = cancel_event
 
         try:
             agent = agent_cls(model=model, env=env, **init_kwargs)
@@ -100,5 +96,4 @@ class EvalAgentFactory:
             task_id=task_id,
             coordinator=coordinator,
             progress_manager=progress_manager,
-            cancel_event=cancel_event,
         )

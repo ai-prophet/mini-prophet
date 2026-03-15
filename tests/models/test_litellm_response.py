@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import types
 
@@ -123,7 +124,7 @@ def test_litellm_response_query_uses_prepare_messages_hook() -> None:
         [{"type": "function_call", "call_id": "call_1", "name": "search", "arguments": "{}"}]
     )
 
-    def fake_query(messages: list[dict], tools: list[dict]):
+    async def fake_query(messages: list[dict], tools: list[dict]):
         captured["messages"] = messages
         captured["tools"] = tools
         return response
@@ -137,7 +138,7 @@ def test_litellm_response_query_uses_prepare_messages_hook() -> None:
     ]
     tools = [{"type": "function", "function": {"name": "search", "parameters": {}}}]
 
-    model.query(msgs, tools)
+    asyncio.run(model.query(msgs, tools))
 
     assert captured["messages"][1] == {
         "type": "function_call_output",
