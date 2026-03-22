@@ -16,6 +16,8 @@ class GlobalModelStats:
     def __init__(self) -> None:
         self._cost = 0.0
         self._n_calls = 0
+        self._total_prompt_tokens = 0
+        self._total_cached_tokens = 0
         self._lock = threading.Lock()
         self.cost_limit = float(os.getenv("MINIPROPHET_GLOBAL_COST_LIMIT", "0"))
 
@@ -30,9 +32,29 @@ class GlobalModelStats:
     def cost(self) -> float:
         return self._cost
 
+    def add_tokens(self, prompt_tokens: int, cached_tokens: int | None) -> None:
+        with self._lock:
+            self._total_prompt_tokens += prompt_tokens
+            if cached_tokens is not None:
+                self._total_cached_tokens += cached_tokens
+
     @property
     def n_calls(self) -> int:
         return self._n_calls
+
+    @property
+    def total_prompt_tokens(self) -> int:
+        return self._total_prompt_tokens
+
+    @property
+    def total_cached_tokens(self) -> int:
+        return self._total_cached_tokens
+
+    @property
+    def cache_hit_rate(self) -> float | None:
+        if self._total_prompt_tokens > 0 and self._total_cached_tokens > 0:
+            return self._total_cached_tokens / self._total_prompt_tokens
+        return None
 
 
 GLOBAL_MODEL_STATS = GlobalModelStats()

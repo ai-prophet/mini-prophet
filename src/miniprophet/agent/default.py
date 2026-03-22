@@ -63,6 +63,10 @@ class DefaultForecastAgent:
         self.n_calls = 0
         self.prompt_tokens = 0
         self.completion_tokens = 0
+        self.cached_tokens: int | None = None
+        self.cache_creation_tokens: int | None = None
+        self.total_prompt_tokens = 0
+        self.total_cached_tokens = 0
         self.max_context_tokens: int | None = None
         self._in_grace_period = False
         self._grace_period_turns = 0
@@ -263,6 +267,13 @@ class DefaultForecastAgent:
         self.model_cost += extra.get("cost", 0.0)
         self.prompt_tokens = extra.get("prompt_tokens", self.prompt_tokens)
         self.completion_tokens = extra.get("completion_tokens", self.completion_tokens)
+        self.cached_tokens = extra.get("cached_tokens")
+        self.cache_creation_tokens = extra.get("cache_creation_tokens")
+        call_prompt = extra.get("prompt_tokens", 0) or 0
+        call_cached = extra.get("cached_tokens")
+        self.total_prompt_tokens += call_prompt
+        if call_cached is not None:
+            self.total_cached_tokens += call_cached
         self.add_messages(message)
         self._trajectory.record_step(input_snapshot, message)
 
@@ -314,6 +325,15 @@ class DefaultForecastAgent:
                 "prompt_tokens": self.prompt_tokens,
                 "completion_tokens": self.completion_tokens,
                 "max_context_tokens": self.max_context_tokens,
+                "cached_tokens": self.cached_tokens,
+                "cache_creation_tokens": self.cache_creation_tokens,
+                "total_prompt_tokens": self.total_prompt_tokens,
+                "total_cached_tokens": self.total_cached_tokens,
+                "cache_hit_rate": (
+                    self.total_cached_tokens / self.total_prompt_tokens
+                    if self.total_prompt_tokens > 0 and self.total_cached_tokens > 0
+                    else None
+                ),
             },
             "config": {
                 "agent": self.config.model_dump(mode="json"),

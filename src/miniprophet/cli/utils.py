@@ -28,8 +28,12 @@ def format_token_summary(
     prompt_tokens: int,
     completion_tokens: int = 0,
     max_context_tokens: int | None = None,
+    *,
+    cached_tokens: int | None = None,
+    total_prompt_tokens: int = 0,
+    total_cached_tokens: int = 0,
 ) -> str:
-    """Format a token usage summary string, e.g. ``context=45.3k/200.0k (23%)  completion=1.2k``."""
+    """Format a token usage summary string, e.g. ``context=45.3k/200.0k (23%)  completion=1.2k  cached=3.0k  cache_rate=70%``."""
     ctx_used = format_token_count(prompt_tokens)
     if max_context_tokens:
         ctx_max = format_token_count(max_context_tokens)
@@ -39,4 +43,9 @@ def format_token_summary(
         token_str = f"context={ctx_used}"
     if completion_tokens > 0:
         token_str += f"  completion={format_token_count(completion_tokens)}"
+    if cached_tokens is not None:
+        token_str += f"  cached={format_token_count(cached_tokens)}"
+    if total_prompt_tokens > 0 and total_cached_tokens > 0:
+        rate = total_cached_tokens / total_prompt_tokens * 100
+        token_str += f"  cache_rate={rate:.0f}%"
     return token_str

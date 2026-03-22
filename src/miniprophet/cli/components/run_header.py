@@ -30,8 +30,9 @@ def print_run_footer(
     total_cost: float,
     *,
     prompt_tokens: int = 0,
-    completion_tokens: int = 0,
     max_context_tokens: int | None = None,
+    total_prompt_tokens: int = 0,
+    total_cached_tokens: int = 0,
 ) -> None:
     console.print()
     console.rule("[bold magenta]Agent Finished[/bold magenta]", style="magenta")
@@ -44,7 +45,7 @@ def print_run_footer(
     if prompt_tokens > 0:
         lines.append(
             f"  [bold]Tokens:[/bold]   "
-            f"{format_token_summary(prompt_tokens, completion_tokens, max_context_tokens)}"
+            f"{format_token_summary(prompt_tokens, 0, max_context_tokens, total_prompt_tokens=total_prompt_tokens, total_cached_tokens=total_cached_tokens)}"
         )
     console.print("\n".join(lines))
     console.print()

@@ -104,6 +104,104 @@ def test_default_agent_tracks_search_cost_and_query_history(
     assert ctx.queries == ["fed rates"]
 
 
+def test_default_agent_tracks_cache_tokens(
+    tmp_path: Path,
+) -> None:
+    """Cache tokens are accumulated across steps and appear in serialize_info."""
+    import time
+
+    model = DummyModel(
+        scripted_messages=[
+            {
+                "role": "assistant",
+                "content": "",
+                "extra": {
+                    "actions": [
+                        {"name": "search", "arguments": '{"query": "q1"}', "tool_call_id": "t1"}
+                    ],
+                    "cost": 0.01,
+                    "prompt_tokens": 1000,
+                    "completion_tokens": 50,
+                    "cached_tokens": 200,
+                    "cache_creation_tokens": 800,
+                    "timestamp": time.time(),
+                },
+            },
+            {
+                "role": "assistant",
+                "content": "",
+                "extra": {
+                    "actions": [
+                        {"name": "search", "arguments": '{"query": "q2"}', "tool_call_id": "t2"}
+                    ],
+                    "cost": 0.01,
+                    "prompt_tokens": 1500,
+                    "completion_tokens": 60,
+                    "cached_tokens": 900,
+                    "cache_creation_tokens": 0,
+                    "timestamp": time.time(),
+                },
+            },
+        ]
+    )
+    env = DummyEnvironment()
+    kwargs = _agent_kwargs(tmp_path)
+    kwargs["step_limit"] = 2
+    agent = DefaultForecastAgent(model=model, env=env, **kwargs)
+    agent.run_sync(title="Q", outcomes=["A", "B"])
+
+    # Latest per-call values should be from the second call
+    assert agent.cached_tokens == 900
+    assert agent.cache_creation_tokens == 0
+
+    # Cumulative totals
+    assert agent.total_prompt_tokens == 2500  # 1000 + 1500
+    assert agent.total_cached_tokens == 1100  # 200 + 900
+
+    # Serialization
+    info = agent.serialize_info()
+    tu = info["token_usage"]
+    assert tu["total_prompt_tokens"] == 2500
+    assert tu["total_cached_tokens"] == 1100
+    assert tu["cache_hit_rate"] == pytest.approx(1100 / 2500)
+
+
+def test_default_agent_cache_tokens_none_when_unsupported(
+    tmp_path: Path,
+) -> None:
+    """When model doesn't provide cache tokens, values remain None/zero."""
+    import time
+
+    model = DummyModel(
+        scripted_messages=[
+            {
+                "role": "assistant",
+                "content": "",
+                "extra": {
+                    "actions": [
+                        {"name": "search", "arguments": '{"query": "q"}', "tool_call_id": "t1"}
+                    ],
+                    "cost": 0.01,
+                    "prompt_tokens": 1000,
+                    "completion_tokens": 50,
+                    "timestamp": time.time(),
+                },
+            },
+        ]
+    )
+    env = DummyEnvironment()
+    kwargs = _agent_kwargs(tmp_path)
+    kwargs["step_limit"] = 1
+    agent = DefaultForecastAgent(model=model, env=env, **kwargs)
+    agent.run_sync(title="Q", outcomes=["A", "B"])
+
+    assert agent.cached_tokens is None
+    assert agent.total_cached_tokens == 0
+
+    info = agent.serialize_info()
+    assert info["token_usage"]["cache_hit_rate"] is None
+
+
 def test_default_agent_rejects_invalid_outcome_count(tmp_path: Path) -> None:
     agent = DefaultForecastAgent(
         model=DummyModel(),
