@@ -65,6 +65,9 @@ class CliForecastAgent(DefaultForecastAgent):
             prompt_tokens=self.prompt_tokens,
             completion_tokens=self.completion_tokens,
             max_context_tokens=self.max_context_tokens,
+            cached_tokens=self.cached_tokens,
+            total_prompt_tokens=self.total_prompt_tokens,
+            total_cached_tokens=self.total_cached_tokens,
         )
 
     def on_model_response(self, message: dict) -> None:
@@ -100,8 +103,9 @@ class CliForecastAgent(DefaultForecastAgent):
             self.search_cost,
             self.total_cost,
             prompt_tokens=self.prompt_tokens,
-            completion_tokens=self.completion_tokens,
             max_context_tokens=self.max_context_tokens,
+            total_prompt_tokens=self.total_prompt_tokens,
+            total_cached_tokens=self.total_cached_tokens,
         )
 
     # ------------------------------------------------------------------

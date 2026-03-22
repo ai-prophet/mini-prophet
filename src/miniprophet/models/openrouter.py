@@ -63,6 +63,10 @@ class OpenRouterModel:
         cost_info = self._calculate_cost(response)
         GLOBAL_MODEL_STATS.add(cost_info["cost"])
         usage_info = self._extract_usage(response)
+        GLOBAL_MODEL_STATS.add_tokens(
+            usage_info.get("prompt_tokens", 0) or 0,
+            usage_info.get("cached_tokens"),
+        )
 
         message = dict(response["choices"][0]["message"])
         message["extra"] = {
@@ -135,14 +139,19 @@ class OpenRouterModel:
             )
         return {"cost": cost}
 
-    def _extract_usage(self, response: dict) -> dict[str, int]:
+    def _extract_usage(self, response: dict) -> dict[str, int | None]:
         """Extract token usage from the OpenRouter response."""
         usage = response.get("usage", {})
-        return {
+        result: dict[str, int | None] = {
             "prompt_tokens": usage.get("prompt_tokens", 0) or 0,
             "completion_tokens": usage.get("completion_tokens", 0) or 0,
             "total_tokens": usage.get("total_tokens", 0) or 0,
         }
+        details = usage.get("prompt_tokens_details") or {}
+        result["cached_tokens"] = details.get("cached_tokens")
+        # OpenRouter uses "cache_write_tokens"; normalize to "cache_creation_tokens"
+        result["cache_creation_tokens"] = details.get("cache_write_tokens")
+        return result
 
     def get_max_context_tokens(self) -> int | None:
         """Return the max input token limit via litellm model info, or via OpenRouter API."""

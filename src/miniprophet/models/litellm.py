@@ -60,6 +60,10 @@ class LitellmModel:
         cost_info = self._calculate_cost(response)
         GLOBAL_MODEL_STATS.add(cost_info["cost"])
         usage_info = self._extract_usage(response)
+        GLOBAL_MODEL_STATS.add_tokens(
+            usage_info.get("prompt_tokens", 0) or 0,
+            usage_info.get("cached_tokens"),
+        )
 
         message = self._build_message(response)
         message["extra"] = {
@@ -106,16 +110,24 @@ class LitellmModel:
                 raise RuntimeError(msg) from e
         return {"cost": cost}
 
-    def _extract_usage(self, response) -> dict[str, int]:
+    def _extract_usage(self, response) -> dict[str, int | None]:
         """Extract token usage from the LiteLLM response."""
         usage = getattr(response, "usage", None)
         if usage is None:
             return {}
-        return {
+        result: dict[str, int | None] = {
             "prompt_tokens": getattr(usage, "prompt_tokens", 0) or 0,
             "completion_tokens": getattr(usage, "completion_tokens", 0) or 0,
             "total_tokens": getattr(usage, "total_tokens", 0) or 0,
         }
+        details = getattr(usage, "prompt_tokens_details", None)
+        if details is not None:
+            result["cached_tokens"] = getattr(details, "cached_tokens", None)
+            result["cache_creation_tokens"] = getattr(details, "cache_creation_tokens", None)
+        else:
+            result["cached_tokens"] = None
+            result["cache_creation_tokens"] = None
+        return result
 
     def get_max_context_tokens(self) -> int | None:
         """Return the max input token limit for the configured model, or None if unknown."""

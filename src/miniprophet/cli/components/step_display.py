@@ -20,12 +20,24 @@ def print_step_header(
     prompt_tokens: int = 0,
     completion_tokens: int = 0,
     max_context_tokens: int | None = None,
+    cached_tokens: int | None = None,
+    total_prompt_tokens: int = 0,
+    total_cached_tokens: int = 0,
 ) -> None:
     cost_str = f"model=${model_cost:.4f}  search=${search_cost:.4f}  total=${total_cost:.4f}"
     parts = [f"[bold]Step {step}[/bold]  |  {cost_str}"]
 
     if prompt_tokens > 0:
-        parts.append(format_token_summary(prompt_tokens, completion_tokens, max_context_tokens))
+        parts.append(
+            format_token_summary(
+                prompt_tokens,
+                completion_tokens,
+                max_context_tokens,
+                cached_tokens=cached_tokens,
+                total_prompt_tokens=total_prompt_tokens,
+                total_cached_tokens=total_cached_tokens,
+            )
+        )
 
     console.rule("  ".join(parts), style="cyan")
 

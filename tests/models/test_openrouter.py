@@ -147,6 +147,32 @@ def test_openrouter_extract_usage_with_none_values() -> None:
     assert result["total_tokens"] == 0
 
 
+def test_openrouter_extract_usage_with_cache_tokens() -> None:
+    m = OpenRouterModel(model_name="test/model", cost_tracking="ignore_errors")
+    result = m._extract_usage(
+        {
+            "usage": {
+                "prompt_tokens": 1000,
+                "completion_tokens": 50,
+                "total_tokens": 1050,
+                "prompt_tokens_details": {
+                    "cached_tokens": 500,
+                    "cache_write_tokens": 200,
+                },
+            }
+        }
+    )
+    assert result["cached_tokens"] == 500
+    assert result["cache_creation_tokens"] == 200
+
+
+def test_openrouter_extract_usage_without_cache_details() -> None:
+    m = OpenRouterModel(model_name="test/model", cost_tracking="ignore_errors")
+    result = m._extract_usage({"usage": {"prompt_tokens": 1000}})
+    assert result["cached_tokens"] is None
+    assert result["cache_creation_tokens"] is None
+
+
 def test_openrouter_format_message() -> None:
     m = OpenRouterModel(model_name="test/model", cost_tracking="ignore_errors")
     msg = m.format_message(role="user", content="hello")
