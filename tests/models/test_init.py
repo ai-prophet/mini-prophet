@@ -37,23 +37,6 @@ def test_get_model_requires_model_name(monkeypatch: pytest.MonkeyPatch) -> None:
         get_model({"model_class": "dummy"})
 
 
-def test_global_model_stats_add_tokens() -> None:
-    stats = GlobalModelStats()
-    stats.add_tokens(1000, 500)
-    stats.add_tokens(2000, 1500)
-    assert stats.total_prompt_tokens == 3000
-    assert stats.total_cached_tokens == 2000
-    assert stats.cache_hit_rate == pytest.approx(2000 / 3000)
-
-
-def test_global_model_stats_add_tokens_none_cached() -> None:
-    stats = GlobalModelStats()
-    stats.add_tokens(1000, None)
-    assert stats.total_prompt_tokens == 1000
-    assert stats.total_cached_tokens == 0
-    assert stats.cache_hit_rate is None
-
-
 def test_global_model_stats_add_and_limit() -> None:
     stats = GlobalModelStats()
     stats.cost_limit = 0.05

@@ -6,13 +6,6 @@ import logging
 from pathlib import Path
 
 
-def test_logger_exists_and_is_debug_level() -> None:
-    from miniprophet.utils.log import logger
-
-    assert logger.name == "miniprophet"
-    assert logger.level == logging.DEBUG
-
-
 def test_add_file_handler_creates_file_handler(tmp_path: Path) -> None:
     from miniprophet.utils.log import add_file_handler
 

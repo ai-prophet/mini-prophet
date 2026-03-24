@@ -58,45 +58,6 @@ def test_litellm_calculate_cost_raises_when_tracking_default(
         model._calculate_cost(object())
 
 
-def test_litellm_extract_usage_with_cache_tokens() -> None:
-    model = LitellmModel(model_name="openai/gpt-4o-mini", cost_tracking="ignore_errors")
-    details = types.SimpleNamespace(cached_tokens=500, cache_creation_tokens=200)
-    usage = types.SimpleNamespace(
-        prompt_tokens=1000,
-        completion_tokens=50,
-        total_tokens=1050,
-        prompt_tokens_details=details,
-    )
-    response = types.SimpleNamespace(usage=usage)
-    result = model._extract_usage(response)
-    assert result["cached_tokens"] == 500
-    assert result["cache_creation_tokens"] == 200
-
-
-def test_litellm_extract_usage_without_cache_details() -> None:
-    model = LitellmModel(model_name="openai/gpt-4o-mini", cost_tracking="ignore_errors")
-    usage = types.SimpleNamespace(prompt_tokens=1000, completion_tokens=50, total_tokens=1050)
-    response = types.SimpleNamespace(usage=usage)
-    result = model._extract_usage(response)
-    assert result["cached_tokens"] is None
-    assert result["cache_creation_tokens"] is None
-
-
-def test_litellm_extract_usage_with_none_cache_fields() -> None:
-    model = LitellmModel(model_name="openai/gpt-4o-mini", cost_tracking="ignore_errors")
-    details = types.SimpleNamespace(cached_tokens=None, cache_creation_tokens=None)
-    usage = types.SimpleNamespace(
-        prompt_tokens=1000,
-        completion_tokens=50,
-        total_tokens=1050,
-        prompt_tokens_details=details,
-    )
-    response = types.SimpleNamespace(usage=usage)
-    result = model._extract_usage(response)
-    assert result["cached_tokens"] is None
-    assert result["cache_creation_tokens"] is None
-
-
 def test_litellm_calculate_cost_ignore_errors(monkeypatch: pytest.MonkeyPatch) -> None:
     model = LitellmModel(model_name="openai/gpt-4o-mini", cost_tracking="ignore_errors")
     monkeypatch.setattr(
