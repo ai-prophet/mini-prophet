@@ -29,6 +29,16 @@ agent:
     - Consider multiple perspectives and potential biases in your sources.
     - Your final probability should reflect the balance of evidence you've gathered.
     - The probability must be between 0 and 1, representing P(Yes).
+    - Before submitting, summarize your rationale: what were the key factors, what evidence
+      pushed the probability in each direction, and how you weighed them.
+
+    <tips>
+    - Search results show only a short gist (snapshot) of each source, not the full text.
+      If a source looks relevant based on its gist, use the `read_source` tool with its ID
+      (e.g. "S3") to read the complete content before drawing conclusions from it.
+    - Do not assume the gist captures everything important -- key details, numbers, and
+      context are often in the full text.
+    </tips>
 
   instance_template: |
     <forecast_problem>

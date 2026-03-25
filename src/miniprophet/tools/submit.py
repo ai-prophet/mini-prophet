@@ -23,8 +23,15 @@ SUBMIT_SCHEMA = {
                         "that the answer is Yes."
                     ),
                 },
+                "rationale": {
+                    "type": "string",
+                    "description": (
+                        "A brief summary of the key factors and reasoning "
+                        "behind your probability estimate."
+                    ),
+                },
             },
-            "required": ["probability"],
+            "required": ["probability", "rationale"],
         },
     },
 }
@@ -59,6 +66,8 @@ class SubmitTool:
                 "error": True,
             }
 
+        rationale = args.get("rationale", "")
+
         submission = {"Yes": float(probability), "No": round(1 - float(probability), 10)}
         raise Submitted(
             {
@@ -67,6 +76,7 @@ class SubmitTool:
                 "extra": {
                     "exit_status": "submitted",
                     "submission": submission,
+                    "rationale": rationale,
                     "sources": self._registry.serialize(),
                 },
             }
