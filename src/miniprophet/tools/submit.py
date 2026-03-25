@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from miniprophet.environment.source_board import SourceBoard
+from miniprophet.environment.source_registry import SourceRegistry
 from miniprophet.exceptions import Submitted
 
 SUBMIT_SCHEMA = {
@@ -33,8 +33,8 @@ SUBMIT_SCHEMA = {
 class SubmitTool:
     """Validates and submits the final binary forecast."""
 
-    def __init__(self, board: SourceBoard) -> None:
-        self._board = board
+    def __init__(self, registry: SourceRegistry) -> None:
+        self._registry = registry
 
     @property
     def name(self) -> str:
@@ -67,7 +67,7 @@ class SubmitTool:
                 "extra": {
                     "exit_status": "submitted",
                     "submission": submission,
-                    "board": self._board.serialize(),
+                    "sources": self._registry.serialize(),
                 },
             }
         )

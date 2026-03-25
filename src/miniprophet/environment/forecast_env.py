@@ -6,10 +6,8 @@ import json
 import logging
 from typing import Any
 
-from pydantic import BaseModel
-
 from miniprophet import Tool
-from miniprophet.environment.source_board import Source, SourceBoard
+from miniprophet.environment.source_registry import SourceRegistry
 from miniprophet.tools.search import SearchBackend
 
 logger = logging.getLogger("miniprophet.environment")
@@ -17,39 +15,30 @@ logger = logging.getLogger("miniprophet.environment")
 
 def create_default_tools(
     search_tool: SearchBackend,
-    board: SourceBoard,
+    registry: SourceRegistry,
     *,
     search_limit: int = 10,
     search_results_limit: int = 5,
-    max_source_display_chars: int = 2000,
 ) -> list[Tool]:
-    """Build the standard set of forecast tools sharing a common board and source registry."""
+    """Build the standard set of forecast tools sharing a common SourceRegistry."""
+    from miniprophet.tools.list_sources_tool import ListSourcesTool
     from miniprophet.tools.search_tool import SearchForecastTool, SearchToolConfig
-    from miniprophet.tools.source_board_tools import AddSourceTool, EditNoteTool
     from miniprophet.tools.submit import SubmitTool
 
-    source_registry: dict[str, Source] = {}
     search_config = SearchToolConfig(
         search_results_limit=search_results_limit,
-        max_source_display_chars=max_source_display_chars,
     )
 
     return [
         SearchForecastTool(
             search_backend=search_tool,
-            source_registry=source_registry,
+            registry=registry,
             search_limit=search_limit,
             config=search_config,
         ),
-        AddSourceTool(source_registry=source_registry, board=board),
-        EditNoteTool(board=board),
-        SubmitTool(board=board),
+        ListSourcesTool(registry=registry),
+        SubmitTool(registry=registry),
     ]
-
-
-class ForecastEnvConfig(BaseModel):
-    search_results_limit: int = 5
-    max_source_display_chars: int = 2000
 
 
 class ForecastEnvironment:
@@ -59,12 +48,12 @@ class ForecastEnvironment:
         self,
         tools: list[Tool],
         *,
-        board: SourceBoard | None = None,
+        registry: SourceRegistry | None = None,
         **kwargs: Any,
     ) -> None:
-        if board is None:
-            board = SourceBoard()
-        self.board = board
+        if registry is None:
+            registry = SourceRegistry()
+        self.registry = registry
         self._tools: dict[str, Tool] = {t.name: t for t in tools}
 
     async def execute(self, action: dict, **kwargs) -> dict:
@@ -88,35 +77,8 @@ class ForecastEnvironment:
         return self._tools.get(name)
 
     def serialize_sources_state(self) -> dict:
-        """Serialize raw searched sources and compact board references."""
-        sources: dict[str, dict] = {}
-        search_tool = self.get_tool("search")
-        if search_tool is not None and hasattr(search_tool, "serialize_sources"):
-            payload = search_tool.serialize_sources()  # type: ignore[attr-defined]
-            if isinstance(payload, dict):
-                sources = payload
-
-        source_board: list[dict] = []
-        for entry in self.board.serialize():
-            board_entry = {
-                "source_id": entry.get("source_id"),
-                "note": entry.get("note", ""),
-                "reaction": entry.get("reaction", {}),
-            }
-            if not board_entry["source_id"]:
-                source = entry.get("source", {})
-                if isinstance(source, dict):
-                    board_entry["source"] = {
-                        "url": source.get("url", ""),
-                        "title": source.get("title", ""),
-                        "date": source.get("date"),
-                    }
-            source_board.append(board_entry)
-
-        return {
-            "sources": sources,
-            "source_board": source_board,
-        }
+        """Serialize all sources from the registry."""
+        return {"sources": self.registry.serialize()}
 
     def serialize(self) -> dict:
         return {}

@@ -27,7 +27,7 @@ class ForecastResult(TypedDict, total=False):
     exit_status: str
     submission: dict[str, float]
     evaluation: dict[str, float]
-    board: list[dict]
+    sources: dict
 
 
 class AgentConfig(BaseModel):
@@ -185,7 +185,7 @@ class DefaultForecastAgent:
         result: ForecastResult = {
             "exit_status": last_extra.get("exit_status", "unknown"),
             "submission": last_extra.get("submission", {}),
-            "board": last_extra.get("board", []),
+            "sources": last_extra.get("sources", {}),
         }
 
         if ground_truth is not None and result.get("submission"):
@@ -196,22 +196,9 @@ class DefaultForecastAgent:
         return result
 
     def _prepare_messages_for_step(self) -> None:
-        """Strip stale board state, apply context manager, inject fresh board state."""
-        self.messages = [m for m in self.messages if not m.get("extra", {}).get("is_board_state")]
-
+        """Apply context manager if enabled. No board injection — context is append-only."""
         if self.context_manager is not None:
             self.messages = self.context_manager.manage(self.messages, step=self.n_calls)
-
-        # Inject fresh board state as invariant at position 2 (after system + user)
-        if hasattr(self.env, "board"):
-            self.messages.insert(
-                2,
-                {
-                    "role": "system",
-                    "content": self.env.board.render(),  # type: ignore
-                    "extra": {"is_board_state": True},
-                },
-            )
 
     async def step(self) -> list[dict]:
         self._prepare_messages_for_step()
@@ -292,12 +279,6 @@ class DefaultForecastAgent:
             if sc:
                 self.search_cost += sc
                 self.n_searches += 1
-            if action.get("name") == "search" and self.context_manager is not None:
-                raw = action.get("arguments", "{}")
-                args = json.loads(raw) if isinstance(raw, str) else raw
-                query = args.get("query", "")
-                if query and hasattr(self.context_manager, "record_query"):
-                    self.context_manager.record_query(query)  # type: ignore
             self.on_observation(action, output)
         return self.add_messages(*self.model.format_observation_messages(message, outputs))
 
