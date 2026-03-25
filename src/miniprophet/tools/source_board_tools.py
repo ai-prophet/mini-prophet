@@ -111,11 +111,10 @@ class AddSourceTool:
         self,
         source_registry: dict[str, Source],
         board: SourceBoard,
-        outcomes: list[str],
     ) -> None:
         self._source_registry = source_registry
         self._board = board
-        self._outcomes = outcomes
+        self._outcomes = ["Yes", "No"]
 
     @property
     def name(self) -> str:
@@ -167,10 +166,9 @@ class EditNoteTool:
     def __init__(
         self,
         board: SourceBoard,
-        outcomes: list[str],
     ) -> None:
         self._board = board
-        self._outcomes = outcomes
+        self._outcomes = ["Yes", "No"]
 
     @property
     def name(self) -> str:

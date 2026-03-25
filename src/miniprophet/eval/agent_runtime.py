@@ -89,7 +89,6 @@ class EvalBatchAgentWrapper:
         self,
         *,
         title: str,
-        outcomes: list[str],
         ground_truth: dict[str, int] | None = None,
         **runtime_kwargs,
     ) -> Any:
@@ -106,7 +105,6 @@ class EvalBatchAgentWrapper:
         try:
             return await self._agent.run(
                 title=title,
-                outcomes=outcomes,
                 ground_truth=ground_truth,
                 **runtime_kwargs,
             )
@@ -117,14 +115,12 @@ class EvalBatchAgentWrapper:
         self,
         *,
         title: str,
-        outcomes: list[str],
         ground_truth: dict[str, int] | None = None,
         **runtime_kwargs,
     ) -> Any:
         return asyncio.run(
             self.run(
                 title=title,
-                outcomes=outcomes,
                 ground_truth=ground_truth,
                 **runtime_kwargs,
             )

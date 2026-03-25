@@ -53,8 +53,8 @@ class CliForecastAgent(DefaultForecastAgent):
     # Hook overrides
     # ------------------------------------------------------------------
 
-    def on_run_start(self, title: str, outcomes: str, config: AgentConfig) -> None:
-        print_run_header(title, outcomes, config.step_limit, config.cost_limit, config.search_limit)
+    def on_run_start(self, title: str, config: AgentConfig) -> None:
+        print_run_header(title, config.step_limit, config.cost_limit, config.search_limit)
 
     def on_step_start(self) -> None:
         print_step_header(
@@ -172,7 +172,6 @@ class CliForecastAgent(DefaultForecastAgent):
     async def run(
         self,
         title: str,
-        outcomes: list[str],
         ground_truth: dict[str, int] | None = None,
         **runtime_kwargs,
     ) -> ForecastResult:
@@ -181,7 +180,7 @@ class CliForecastAgent(DefaultForecastAgent):
             self._original_sigint_handler = signal.getsignal(signal.SIGINT)
             signal.signal(signal.SIGINT, self._handle_sigint)
         try:
-            return await super().run(title, outcomes, ground_truth, **runtime_kwargs)
+            return await super().run(title, ground_truth, **runtime_kwargs)
         finally:
             if self._original_sigint_handler is not None:
                 signal.signal(signal.SIGINT, self._original_sigint_handler)

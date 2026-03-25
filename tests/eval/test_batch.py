@@ -35,12 +35,10 @@ class _SimpleAgent:
     async def step(self) -> list[dict]:
         return [{"role": "tool", "content": "ok"}]
 
-    async def run(
-        self, *, title: str, outcomes: list[str], ground_truth: Any = None, **kw: Any
-    ) -> dict:
+    async def run(self, *, title: str, ground_truth: Any = None, **kw: Any) -> dict:
         return {
             "exit_status": "submitted",
-            "submission": {o: 1.0 / len(outcomes) for o in outcomes},
+            "submission": {"Yes": 0.5, "No": 0.5},
         }
 
     def run_sync(self, **kw: Any) -> dict:
@@ -71,10 +69,7 @@ class _ProgressTracker:
 
 
 def _make_problems(n: int = 2) -> list[ForecastProblem]:
-    return [
-        ForecastProblem(task_id=f"q{i}", title=f"Question {i}", outcomes=["Yes", "No"])
-        for i in range(1, n + 1)
-    ]
+    return [ForecastProblem(task_id=f"q{i}", title=f"Question {i}") for i in range(1, n + 1)]
 
 
 def test_forecast_result_defaults() -> None:

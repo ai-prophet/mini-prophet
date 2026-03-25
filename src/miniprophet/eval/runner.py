@@ -180,7 +180,6 @@ async def process_problem(
         board = SourceBoard()
         tools = create_default_tools(
             search_tool=state.search_backend,
-            outcomes=problem.outcomes,
             board=board,
             search_limit=agent_search_limit,
             search_results_limit=search_cfg.get("search_results_limit", 5),
@@ -215,7 +214,6 @@ async def process_problem(
         forecast = await asyncio.wait_for(
             agent.run(
                 title=problem.title,
-                outcomes=problem.outcomes,
                 ground_truth=problem.ground_truth,
                 **runtime_kwargs,
             ),

@@ -7,13 +7,10 @@ from miniprophet.cli.utils import format_token_summary, get_console
 console = get_console()
 
 
-def print_run_header(
-    title: str, outcomes: str, step_limit: int, cost_limit: float, search_limit: int
-) -> None:
+def print_run_header(title: str, step_limit: int, cost_limit: float, search_limit: int) -> None:
     console.print()
     console.rule("[bold magenta]Forecasting Agent[/bold magenta]", style="magenta")
     console.print(f"  [bold]Question:[/bold] {title}")
-    console.print(f"  [bold]Outcomes:[/bold] {outcomes}")
     console.print(
         f"  [bold]Limits:[/bold]   steps={step_limit}  "
         f"cost=${cost_limit:.2f}  searches={search_limit}"

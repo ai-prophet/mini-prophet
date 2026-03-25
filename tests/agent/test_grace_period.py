@@ -35,11 +35,10 @@ TEST_GRACE_PROMPT = "Submit now using the submit tool."
 def _grace_kwargs(tmp_path: Path, **overrides) -> dict:
     defaults = {
         "system_template": "sys: {title}",
-        "instance_template": "inst: {title} {outcomes_formatted} {current_time}",
+        "instance_template": "inst: {title} {current_time}",
         "step_limit": 2,
         "cost_limit": 99.0,
         "search_limit": 9,
-        "max_outcomes": 10,
         "output_path": tmp_path,
         "enable_grace_period": True,
         "grace_period_extra_turns": 3,
@@ -60,15 +59,13 @@ def test_grace_period_allows_submit_after_step_limit(
             # Step 2: another search (consumes step_limit=2)
             assistant_action_message(name="search", arguments='{"query": "test2"}'),
             # Grace period turn 1: agent submits
-            assistant_action_message(
-                name="submit", arguments='{"probabilities": {"Yes": 0.7, "No": 0.3}}'
-            ),
+            assistant_action_message(name="submit", arguments='{"probability": 0.7}'),
         ]
     )
     env = _SubmitEnv()
     agent = DefaultForecastAgent(model=model, env=env, **_grace_kwargs(tmp_path))
 
-    result = agent.run_sync(title="Q", outcomes=["Yes", "No"])
+    result = agent.run_sync(title="Q")
 
     assert result["exit_status"] == "submitted"
     assert result["submission"] == {"Yes": 0.7, "No": 0.3}
@@ -87,15 +84,13 @@ def test_grace_period_rejects_non_submit_tools(assistant_action_message, tmp_pat
             # Grace turn 1: tries search (rejected)
             assistant_action_message(name="search", arguments='{"query": "test3"}'),
             # Grace turn 2: submits
-            assistant_action_message(
-                name="submit", arguments='{"probabilities": {"Yes": 0.7, "No": 0.3}}'
-            ),
+            assistant_action_message(name="submit", arguments='{"probability": 0.7}'),
         ]
     )
     env = _SubmitEnv()
     agent = DefaultForecastAgent(model=model, env=env, **_grace_kwargs(tmp_path))
 
-    result = agent.run_sync(title="Q", outcomes=["Yes", "No"])
+    result = agent.run_sync(title="Q")
 
     assert result["exit_status"] == "submitted"
     assert agent._grace_period_turns == 2
@@ -118,7 +113,7 @@ def test_grace_period_exhausted_after_extra_turns(assistant_action_message, tmp_
     env = _SubmitEnv()
     agent = DefaultForecastAgent(model=model, env=env, **_grace_kwargs(tmp_path))
 
-    result = agent.run_sync(title="Q", outcomes=["Yes", "No"])
+    result = agent.run_sync(title="Q")
 
     assert result["exit_status"] == "LimitsExceeded"
     assert agent._grace_period_turns == 3
@@ -136,7 +131,7 @@ def test_grace_period_disabled_fails_immediately(assistant_action_message, tmp_p
     kwargs = _grace_kwargs(tmp_path, enable_grace_period=False)
     agent = DefaultForecastAgent(model=model, env=env, **kwargs)
 
-    result = agent.run_sync(title="Q", outcomes=["Yes", "No"])
+    result = agent.run_sync(title="Q")
 
     assert result["exit_status"] == "LimitsExceeded"
     assert agent._in_grace_period is False
@@ -151,15 +146,13 @@ def test_grace_period_prompt_injected_as_user_message(
             assistant_action_message(name="search", arguments='{"query": "test"}'),
             assistant_action_message(name="search", arguments='{"query": "test2"}'),
             # Grace turn: submit
-            assistant_action_message(
-                name="submit", arguments='{"probabilities": {"Yes": 0.7, "No": 0.3}}'
-            ),
+            assistant_action_message(name="submit", arguments='{"probability": 0.7}'),
         ]
     )
     env = _SubmitEnv()
     agent = DefaultForecastAgent(model=model, env=env, **_grace_kwargs(tmp_path))
 
-    agent.run_sync(title="Q", outcomes=["Yes", "No"])
+    agent.run_sync(title="Q")
 
     # Find the grace period prompt in messages
     grace_messages = [
@@ -177,16 +170,14 @@ def test_grace_period_custom_prompt(assistant_action_message, tmp_path: Path) ->
         scripted_messages=[
             assistant_action_message(name="search", arguments='{"query": "test"}'),
             assistant_action_message(name="search", arguments='{"query": "test2"}'),
-            assistant_action_message(
-                name="submit", arguments='{"probabilities": {"Yes": 0.7, "No": 0.3}}'
-            ),
+            assistant_action_message(name="submit", arguments='{"probability": 0.7}'),
         ]
     )
     env = _SubmitEnv()
     kwargs = _grace_kwargs(tmp_path, grace_period_prompt=custom_prompt)
     agent = DefaultForecastAgent(model=model, env=env, **kwargs)
 
-    agent.run_sync(title="Q", outcomes=["Yes", "No"])
+    agent.run_sync(title="Q")
 
     custom_messages = [
         m for m in agent.messages if m.get("content") == custom_prompt and m.get("role") == "user"
@@ -207,9 +198,7 @@ def test_grace_period_keeps_all_tool_schemas(assistant_action_message, tmp_path:
         scripted_messages=[
             assistant_action_message(name="search", arguments='{"query": "test"}'),
             assistant_action_message(name="search", arguments='{"query": "test2"}'),
-            assistant_action_message(
-                name="submit", arguments='{"probabilities": {"Yes": 0.7, "No": 0.3}}'
-            ),
+            assistant_action_message(name="submit", arguments='{"probability": 0.7}'),
         ]
     )
 
@@ -220,7 +209,7 @@ def test_grace_period_keeps_all_tool_schemas(assistant_action_message, tmp_path:
     }
     agent = DefaultForecastAgent(model=model, env=env, **_grace_kwargs(tmp_path))
 
-    agent.run_sync(title="Q", outcomes=["Yes", "No"])
+    agent.run_sync(title="Q")
 
     # All queries should receive the same full set of tool schemas
     assert tools_seen[-1] == tools_seen[0]

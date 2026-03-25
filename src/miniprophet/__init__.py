@@ -81,7 +81,6 @@ class Agent(Protocol):
     async def run(
         self,
         title: str,
-        outcomes: list[str],
         ground_truth: dict[str, int] | None = None,
         **kw,
     ) -> dict: ...
@@ -89,7 +88,6 @@ class Agent(Protocol):
     def run_sync(
         self,
         title: str,
-        outcomes: list[str],
         ground_truth: dict[str, int] | None = None,
         **kw,
     ) -> dict: ...

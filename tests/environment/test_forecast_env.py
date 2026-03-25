@@ -59,7 +59,7 @@ def test_forecast_environment_execute_unknown_tool() -> None:
 def test_create_default_tools_and_serialize_sources_state(two_sources: list[Source]) -> None:
     board = SourceBoard()
     backend = DummySearchTool(sources=two_sources)
-    tools = create_default_tools(search_tool=backend, outcomes=["A", "B"], board=board)
+    tools = create_default_tools(search_tool=backend, board=board)
     env = ForecastEnvironment(tools, board=board)
 
     search_tool = env.get_tool("search")
@@ -70,7 +70,7 @@ def test_create_default_tools_and_serialize_sources_state(two_sources: list[Sour
         env.execute(
             {
                 "name": "add_source",
-                "arguments": '{"source_id": "S1", "note": "n", "reaction": {"A": "neutral"}}',
+                "arguments": '{"source_id": "S1", "note": "n", "reaction": {"Yes": "neutral"}}',
             }
         )
     )

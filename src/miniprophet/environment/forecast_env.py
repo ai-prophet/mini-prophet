@@ -17,7 +17,6 @@ logger = logging.getLogger("miniprophet.environment")
 
 def create_default_tools(
     search_tool: SearchBackend,
-    outcomes: list[str],
     board: SourceBoard,
     *,
     search_limit: int = 10,
@@ -42,9 +41,9 @@ def create_default_tools(
             search_limit=search_limit,
             config=search_config,
         ),
-        AddSourceTool(source_registry=source_registry, board=board, outcomes=outcomes),
-        EditNoteTool(board=board, outcomes=outcomes),
-        SubmitTool(outcomes=outcomes, board=board),
+        AddSourceTool(source_registry=source_registry, board=board),
+        EditNoteTool(board=board),
+        SubmitTool(board=board),
     ]
 
 

@@ -29,11 +29,10 @@ class _SubmitEnv(DummyEnvironment):
 def _agent_kwargs(tmp_path: Path) -> dict:
     return {
         "system_template": "sys: {title}",
-        "instance_template": "inst: {title} {outcomes_formatted} {current_time}",
+        "instance_template": "inst: {title} {current_time}",
         "step_limit": 2,
         "cost_limit": 99.0,
         "search_limit": 9,
-        "max_outcomes": 10,
         "output_path": tmp_path,
     }
 
@@ -44,9 +43,7 @@ def test_default_agent_run_submitted_and_evaluated(
 ) -> None:
     model = DummyModel(
         scripted_messages=[
-            assistant_action_message(
-                name="submit", arguments='{"probabilities": {"Yes": 0.7, "No": 0.3}}'
-            )
+            assistant_action_message(name="submit", arguments='{"probability": 0.7}')
         ]
     )
     env = _SubmitEnv()
@@ -54,7 +51,6 @@ def test_default_agent_run_submitted_and_evaluated(
 
     result = agent.run_sync(
         title="Will X happen?",
-        outcomes=["Yes", "No"],
         ground_truth={"Yes": 1, "No": 0},
     )
 
@@ -95,7 +91,7 @@ def test_default_agent_tracks_search_cost_and_query_history(
     kwargs["step_limit"] = 1
     agent = DefaultForecastAgent(model=model, env=env, context_manager=ctx, **kwargs)
 
-    result = agent.run_sync(title="Q", outcomes=["A", "B"])
+    result = agent.run_sync(title="Q")
 
     assert result["exit_status"] == "LimitsExceeded"
     assert agent.model_cost == pytest.approx(0.11)
@@ -148,7 +144,7 @@ def test_default_agent_tracks_cache_tokens(
     kwargs = _agent_kwargs(tmp_path)
     kwargs["step_limit"] = 2
     agent = DefaultForecastAgent(model=model, env=env, **kwargs)
-    agent.run_sync(title="Q", outcomes=["A", "B"])
+    agent.run_sync(title="Q")
 
     # Latest per-call values should be from the second call
     assert agent.cached_tokens == 900
@@ -193,24 +189,10 @@ def test_default_agent_cache_tokens_none_when_unsupported(
     kwargs = _agent_kwargs(tmp_path)
     kwargs["step_limit"] = 1
     agent = DefaultForecastAgent(model=model, env=env, **kwargs)
-    agent.run_sync(title="Q", outcomes=["A", "B"])
+    agent.run_sync(title="Q")
 
     assert agent.cached_tokens is None
     assert agent.total_cached_tokens == 0
 
     info = agent.serialize_info()
     assert info["token_usage"]["cache_hit_rate"] is None
-
-
-def test_default_agent_rejects_invalid_outcome_count(tmp_path: Path) -> None:
-    agent = DefaultForecastAgent(
-        model=DummyModel(),
-        env=DummyEnvironment(),
-        **{
-            **_agent_kwargs(tmp_path),
-            "max_outcomes": 1,
-        },
-    )
-
-    with pytest.raises(ValueError, match="Too many outcomes"):
-        agent.run_sync(title="Q", outcomes=["A", "B"])

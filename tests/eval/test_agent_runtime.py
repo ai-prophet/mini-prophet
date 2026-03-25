@@ -23,7 +23,7 @@ def test_wrapper_run_updates_progress() -> None:
         model=DummyModel(),
         env=DummyEnvironment(),
         system_template="sys",
-        instance_template="inst: {title} {outcomes_formatted} {current_time}",
+        instance_template="inst: {title} {current_time}",
         step_limit=1,
     )
     wrapper = EvalBatchAgentWrapper(
@@ -35,7 +35,6 @@ def test_wrapper_run_updates_progress() -> None:
     asyncio.run(
         wrapper.run(
             title="Q",
-            outcomes=["A", "B"],
         )
     )
 

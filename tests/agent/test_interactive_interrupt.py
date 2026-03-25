@@ -41,11 +41,10 @@ class _SubmitEnv(_CliDummyEnvironment):
 def _agent_kwargs(tmp_path: Path) -> dict:
     return {
         "system_template": "sys: {title}",
-        "instance_template": "inst: {title} {outcomes_formatted} {current_time}",
+        "instance_template": "inst: {title} {current_time}",
         "step_limit": 10,
         "cost_limit": 99.0,
         "search_limit": 9,
-        "max_outcomes": 10,
         "output_path": tmp_path,
         "enable_interrupt": True,
     }
@@ -97,7 +96,7 @@ def test_interrupt_after_tool_action_injects_user_message(
 
     agent.step = step_with_interrupt
 
-    result = agent.run_sync(title="Q?", outcomes=["Yes", "No"])
+    result = agent.run_sync(title="Q?")
 
     # The user message should be in the conversation
     user_interrupt_msgs = [m for m in agent.messages if m.get("extra", {}).get("is_user_interrupt")]
@@ -159,7 +158,7 @@ def test_interrupt_no_action_injects_user_message_directly(
 
     agent.step = step_with_interrupt
 
-    agent.run_sync(title="Q?", outcomes=["Yes", "No"])
+    agent.run_sync(title="Q?")
 
     user_interrupt_msgs = [m for m in agent.messages if m.get("extra", {}).get("is_user_interrupt")]
     assert len(user_interrupt_msgs) == 1
@@ -204,7 +203,7 @@ def test_empty_input_does_not_inject_message(
 
     agent.step = step_with_interrupt
 
-    result = agent.run_sync(title="Q?", outcomes=["Yes", "No"])
+    result = agent.run_sync(title="Q?")
 
     user_interrupt_msgs = [m for m in agent.messages if m.get("extra", {}).get("is_user_interrupt")]
     assert len(user_interrupt_msgs) == 0
@@ -249,7 +248,7 @@ def test_signal_handler_restored_after_run(
 
     original_handler = signal.getsignal(signal.SIGINT)
 
-    agent.run_sync(title="Q?", outcomes=["Yes", "No"])
+    agent.run_sync(title="Q?")
 
     # After run, the original handler should be restored
     restored_handler = signal.getsignal(signal.SIGINT)
@@ -273,7 +272,7 @@ def test_signal_handler_restored_on_exception(
     original_handler = signal.getsignal(signal.SIGINT)
 
     with pytest.raises(RuntimeError, match="boom"):
-        agent.run_sync(title="Q?", outcomes=["Yes", "No"])
+        agent.run_sync(title="Q?")
 
     restored_handler = signal.getsignal(signal.SIGINT)
     assert restored_handler is original_handler
@@ -302,6 +301,6 @@ def test_interactive_disabled_no_signal_handler(
     agent = CliForecastAgent(model=model, env=env, **kwargs)
 
     original_handler = signal.getsignal(signal.SIGINT)
-    agent.run_sync(title="Q?", outcomes=["Yes", "No"])
+    agent.run_sync(title="Q?")
     # Handler should never have changed
     assert signal.getsignal(signal.SIGINT) is original_handler

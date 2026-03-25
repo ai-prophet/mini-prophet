@@ -15,7 +15,11 @@ from pydantic import BaseModel
 from miniprophet import ContextManager, Environment, Model, __version__
 from miniprophet.agent.trajectory import TrajectoryRecorder
 from miniprophet.exceptions import InterruptAgentFlow, LimitsExceeded
-from miniprophet.utils.metrics import evaluate_submission, validate_ground_truth
+from miniprophet.utils.metrics import (
+    evaluate_submission,
+    normalize_ground_truth,
+    validate_ground_truth,
+)
 from miniprophet.utils.serialize import recursive_merge
 
 
@@ -32,7 +36,6 @@ class AgentConfig(BaseModel):
     step_limit: int = 30
     cost_limit: float = 3.0
     search_limit: int = 10
-    max_outcomes: int = 20
     context_window: int = 6
     output_path: Path | None = None
     show_current_time: bool = False
@@ -105,7 +108,7 @@ class DefaultForecastAgent:
         )
 
     # Hook methods (no-ops; overridden by subclasses like CliForecastAgent)
-    def on_run_start(self, title: str, outcomes: str, config: AgentConfig) -> None:
+    def on_run_start(self, title: str, config: AgentConfig) -> None:
         pass
 
     def on_step_start(self) -> None:
@@ -124,30 +127,23 @@ class DefaultForecastAgent:
     def run_sync(
         self,
         title: str,
-        outcomes: list[str],
         ground_truth: dict[str, int] | None = None,
         **runtime_kwargs,
     ) -> ForecastResult:
-        return asyncio.run(self.run(title, outcomes, ground_truth, **runtime_kwargs))
+        return asyncio.run(self.run(title, ground_truth, **runtime_kwargs))
 
     async def run(
         self,
         title: str,
-        outcomes: list[str],
         ground_truth: dict[str, int] | None = None,
         **runtime_kwargs,
     ) -> ForecastResult:
-        if len(outcomes) > self.config.max_outcomes:
-            raise ValueError(
-                f"Too many outcomes ({len(outcomes)} > {self.config.max_outcomes}). "
-                "Increase `max_outcomes` in config if intentional."
-            )
         if ground_truth is not None:
-            validate_ground_truth(outcomes, ground_truth)
+            ground_truth = normalize_ground_truth(ground_truth)
+            validate_ground_truth(ground_truth)
 
         self.runtime_kwargs = runtime_kwargs
 
-        outcomes_formatted = ", ".join(outcomes)
         current_time = (
             datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S %Z")
             if self.config.show_current_time
@@ -157,22 +153,19 @@ class DefaultForecastAgent:
         self.add_messages(
             self.model.format_message(
                 role="system",
-                content=self._render(
-                    self.config.system_template, title=title, outcomes_formatted=outcomes_formatted
-                ),
+                content=self._render(self.config.system_template, title=title),
             ),
             self.model.format_message(
                 role="user",
                 content=self._render(
                     self.config.instance_template,
                     title=title,
-                    outcomes_formatted=outcomes_formatted,
                     current_time=current_time,
                 ),
             ),
         )
 
-        self.on_run_start(title, outcomes_formatted, self.config)
+        self.on_run_start(title, self.config)
 
         while True:
             try:
