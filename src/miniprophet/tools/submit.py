@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from miniprophet.environment.source_board import SourceBoard
+from miniprophet.environment.source_registry import SourceRegistry
 from miniprophet.exceptions import Submitted
 
 SUBMIT_SCHEMA = {
@@ -23,8 +23,15 @@ SUBMIT_SCHEMA = {
                         "that the answer is Yes."
                     ),
                 },
+                "rationale": {
+                    "type": "string",
+                    "description": (
+                        "A brief summary of the key factors and reasoning "
+                        "behind your probability estimate."
+                    ),
+                },
             },
-            "required": ["probability"],
+            "required": ["probability", "rationale"],
         },
     },
 }
@@ -33,8 +40,8 @@ SUBMIT_SCHEMA = {
 class SubmitTool:
     """Validates and submits the final binary forecast."""
 
-    def __init__(self, board: SourceBoard) -> None:
-        self._board = board
+    def __init__(self, registry: SourceRegistry) -> None:
+        self._registry = registry
 
     @property
     def name(self) -> str:
@@ -59,6 +66,8 @@ class SubmitTool:
                 "error": True,
             }
 
+        rationale = args.get("rationale", "")
+
         submission = {"Yes": float(probability), "No": round(1 - float(probability), 10)}
         raise Submitted(
             {
@@ -67,7 +76,8 @@ class SubmitTool:
                 "extra": {
                     "exit_status": "submitted",
                     "submission": submission,
-                    "board": self._board.serialize(),
+                    "rationale": rationale,
+                    "sources": self._registry.serialize(),
                 },
             }
         )

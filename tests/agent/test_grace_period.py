@@ -22,7 +22,7 @@ class _SubmitEnv(DummyEnvironment):
                     "extra": {
                         "exit_status": "submitted",
                         "submission": {"Yes": 0.7, "No": 0.3},
-                        "board": [],
+                        "sources": {},
                     },
                 }
             )

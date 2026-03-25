@@ -67,7 +67,7 @@ def main(
     from miniprophet.agent.context import get_context_manager
     from miniprophet.config import get_config_from_spec
     from miniprophet.environment.forecast_env import ForecastEnvironment, create_default_tools
-    from miniprophet.environment.source_board import SourceBoard
+    from miniprophet.environment.source_registry import SourceRegistry
     from miniprophet.models import get_model
     from miniprophet.tools.search import get_search_backend
     from miniprophet.utils.metrics import normalize_ground_truth
@@ -144,15 +144,15 @@ def main(
         search_backend = get_search_backend(search_cfg=search_cfg)
 
         agent_search_limit = config.get("agent", {}).get("search_limit", 10)
-        board = SourceBoard()
+        max_gist = search_cfg.get("max_source_display_chars", 200)
+        registry = SourceRegistry(max_gist_chars=max_gist)
         tools = create_default_tools(
             search_tool=search_backend,
-            board=board,
+            registry=registry,
             search_limit=agent_search_limit,
             search_results_limit=search_cfg.get("search_results_limit", 5),
-            max_source_display_chars=search_cfg.get("max_source_display_chars", 2000),
         )
-        env = ForecastEnvironment(tools, board=board)
+        env = ForecastEnvironment(tools, registry=registry)
 
         cm_cfg = config.get("context_manager", {})
         ctx_mgr = get_context_manager(cm_cfg)

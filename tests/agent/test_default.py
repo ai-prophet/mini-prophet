@@ -19,7 +19,7 @@ class _SubmitEnv(DummyEnvironment):
                     "extra": {
                         "exit_status": "submitted",
                         "submission": {"Yes": 0.7, "No": 0.3},
-                        "board": [],
+                        "sources": {},
                     },
                 }
             )
@@ -76,7 +76,7 @@ class _RecordingContext:
         return None
 
 
-def test_default_agent_tracks_search_cost_and_query_history(
+def test_default_agent_tracks_search_cost(
     assistant_action_message,
     tmp_path: Path,
 ) -> None:
@@ -86,10 +86,9 @@ def test_default_agent_tracks_search_cost_and_query_history(
         ]
     )
     env = DummyEnvironment(outputs=[{"output": "ok", "search_cost": 0.25}])
-    ctx = _RecordingContext()
     kwargs = _agent_kwargs(tmp_path)
     kwargs["step_limit"] = 1
-    agent = DefaultForecastAgent(model=model, env=env, context_manager=ctx, **kwargs)
+    agent = DefaultForecastAgent(model=model, env=env, **kwargs)
 
     result = agent.run_sync(title="Q")
 
@@ -97,7 +96,6 @@ def test_default_agent_tracks_search_cost_and_query_history(
     assert agent.model_cost == pytest.approx(0.11)
     assert agent.search_cost == pytest.approx(0.25)
     assert agent.n_searches == 1
-    assert ctx.queries == ["fed rates"]
 
 
 def test_default_agent_tracks_cache_tokens(

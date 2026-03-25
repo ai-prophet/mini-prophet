@@ -155,7 +155,7 @@ async def process_problem(
     """Process a single forecasting problem. Returns True if complete/permanent failure."""
     from miniprophet.agent.context import get_context_manager
     from miniprophet.environment.forecast_env import ForecastEnvironment, create_default_tools
-    from miniprophet.environment.source_board import SourceBoard
+    from miniprophet.environment.source_registry import SourceRegistry
 
     task_id = problem.task_id
     run_dir = args.output_dir / "runs" / task_id
@@ -177,15 +177,15 @@ async def process_problem(
         search_cfg = args.config.get("search", {})
         agent_cfg = args.config.get("agent", {})
         agent_search_limit = int(agent_cfg.get("search_limit", 10) or 10)
-        board = SourceBoard()
+        max_gist = int(search_cfg.get("max_source_display_chars", 200) or 200)
+        registry = SourceRegistry(max_gist_chars=max_gist)
         tools = create_default_tools(
             search_tool=state.search_backend,
-            board=board,
+            registry=registry,
             search_limit=agent_search_limit,
             search_results_limit=search_cfg.get("search_results_limit", 5),
-            max_source_display_chars=search_cfg.get("max_source_display_chars", 2000),
         )
-        env = ForecastEnvironment(tools, board=board)
+        env = ForecastEnvironment(tools, registry=registry)
 
         cm_cfg = args.config.get("context_manager", {})
         ctx_mgr = get_context_manager(cm_cfg)
