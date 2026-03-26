@@ -9,7 +9,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from miniprophet.environment.source_board import Source
-from miniprophet.environment.source_registry import SourceRegistry
+from miniprophet.environment.source_registry import SourceRegistry, render_source_preview
 from miniprophet.exceptions import SearchAuthError, SearchError
 from miniprophet.tools.search import SearchBackend, SearchResult
 
@@ -86,7 +86,9 @@ class SearchForecastTool:
             return {
                 "output": (
                     f"Search limit reached ({self._search_limit} queries). "
-                    "Use your existing sources to submit a forecast."
+                    "You can still use `read_source` to read the full text of sources "
+                    "you have already found, or `list_sources` to review them. "
+                    "Then submit your forecast."
                 ),
                 "error": True,
             }
@@ -117,16 +119,18 @@ class SearchForecastTool:
         if not search_results:
             body = "No sources found for this query."
         else:
-            max_gist = self._registry.max_gist_chars
             lines: list[str] = [f'<search_results count="{len(search_results)}">']
             for sid, src in search_results:
-                date_line = f"Date: {src.date or 'No date info'}\n"
-                gist = src.snippet[:max_gist]
+                entry = await self._registry.get(sid)
                 lines.append(
-                    f'<result id="{sid}" title="{src.title}" url="{src.url}">\n'
-                    f"{date_line}"
-                    f"Gist: {gist}\n"
-                    f"</result>"
+                    render_source_preview(
+                        source_id=sid,
+                        title=src.title,
+                        url=src.url,
+                        date=src.date,
+                        gist=entry.gist,
+                        full_length=len(src.snippet),
+                    )
                 )
             lines.append("</search_results>")
             body = "\n".join(lines)

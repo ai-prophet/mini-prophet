@@ -18,9 +18,33 @@ agent:
     ## Strategy (for valid binary questions)
 
     1. Search for relevant, recent information about the forecasting problem.
-    2. Review search results -- each result includes a brief gist of the source content.
-    3. Use `list_sources` at any time to review all sources you have discovered so far.
-    4. Once you have gathered sufficient evidence, submit your probabilistic forecast.
+    2. Review search results -- each result is a **preview** (short gist), not the full text.
+    3. When a source preview looks relevant, use `read_source` to get the full content.
+       Do NOT draw conclusions from previews alone -- key details are often in the full text.
+    4. Use `list_sources` at any time to review all sources you have discovered so far.
+    5. Once you have gathered sufficient evidence, submit your probabilistic forecast.
+
+    ## Working with sources
+
+    IMPORTANT: Search results are previews, not complete articles. Each preview shows a
+    truncated gist and tells you how much content remains (e.g. "[preview: 200/3400 chars]").
+    The full text may contain critical numbers, quotes, dates, or context that the preview omits.
+
+    - When you see a relevant source preview, call `read_source` with its ID to get the full text.
+    - When you want to review everything found so far, call `list_sources`.
+    - Prefer reading 2-3 sources deeply over skimming 10 previews. Depth beats breadth.
+
+    <example>
+    After searching "Fed interest rate decision June 2026", you see:
+      <source_preview id="S4" title="Fed Holds Rates Steady" url="...">
+      The Federal Reserve announced... [preview: 200/2800 chars — use read_source("S4") for full text]
+      </source_preview>
+
+    This preview is too short to know the details. Your next step should be:
+      → call read_source with source_id="S4" to read the full 2800-character article.
+    Do NOT assume "holds rates steady" tells the full story — the article may discuss
+    future guidance, dissenting votes, or conditional language that changes the forecast.
+    </example>
 
     ## Guidelines
 
@@ -31,14 +55,6 @@ agent:
     - The probability must be between 0 and 1, representing P(Yes).
     - Before submitting, summarize your rationale: what were the key factors, what evidence
       pushed the probability in each direction, and how you weighed them.
-
-    <tips>
-    - Search results show only a short gist (snapshot) of each source, not the full text.
-      If a source looks relevant based on its gist, use the `read_source` tool with its ID
-      (e.g. "S3") to read the complete content before drawing conclusions from it.
-    - Do not assume the gist captures everything important -- key details, numbers, and
-      context are often in the full text.
-    </tips>
 
   instance_template: |
     <forecast_problem>

@@ -26,6 +26,7 @@ from miniprophet.utils.serialize import recursive_merge
 class ForecastResult(TypedDict, total=False):
     exit_status: str
     submission: dict[str, float]
+    rationale: str
     evaluation: dict[str, float]
     sources: dict
 
@@ -185,6 +186,7 @@ class DefaultForecastAgent:
         result: ForecastResult = {
             "exit_status": last_extra.get("exit_status", "unknown"),
             "submission": last_extra.get("submission", {}),
+            "rationale": last_extra.get("rationale", ""),
             "sources": last_extra.get("sources", {}),
         }
 

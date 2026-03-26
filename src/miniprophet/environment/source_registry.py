@@ -9,6 +9,49 @@ from typing import Any
 from miniprophet.environment.source_board import Source
 
 
+def truncate_at_word_boundary(text: str, max_chars: int) -> str:
+    """Truncate text at a word boundary, returning at most max_chars characters."""
+    if len(text) <= max_chars:
+        return text
+    # Find the last space at or before max_chars
+    cut = text.rfind(" ", 0, max_chars)
+    if cut <= 0:
+        # No space found — hard cut
+        return text[:max_chars]
+    return text[:cut]
+
+
+def render_source_preview(
+    source_id: str,
+    title: str,
+    url: str,
+    date: str | None,
+    gist: str,
+    full_length: int | None = None,
+    problem_id: str | None = None,
+) -> str:
+    """Render a single <source_preview> XML element.
+
+    Shared by SearchForecastTool and ListSourcesTool for consistent formatting.
+    ``full_length``, when provided and greater than the gist, adds a truncation
+    hint that tells the model how to retrieve the full text.
+    """
+    attrs = f'id="{source_id}" title="{title}" url="{url}"'
+    if date:
+        attrs += f' date="{date}"'
+    if problem_id is not None:
+        attrs += f' problem_id="{problem_id}"'
+
+    trunc_note = ""
+    if full_length is not None and full_length > len(gist):
+        trunc_note = (
+            f" [preview: {len(gist)}/{full_length} chars — "
+            f'use read_source("{source_id}") for full text]'
+        )
+
+    return f"<source_preview {attrs}>\n{gist}{trunc_note}\n</source_preview>"
+
+
 @dataclass
 class SourceSummary:
     """Summary metadata for a registered source (saves context space)."""
@@ -43,7 +86,7 @@ class SourceRegistry:
         async with self._lock:
             sid = f"S{self._next_id}"
             self._next_id += 1
-            gist = source.snippet[: self._max_gist_chars]
+            gist = truncate_at_word_boundary(source.snippet, self._max_gist_chars)
             self._entries[sid] = SourceSummary(source=source, problem_id=problem_id, gist=gist)
             return sid
 
