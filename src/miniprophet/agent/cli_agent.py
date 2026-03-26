@@ -11,7 +11,7 @@ from rich.spinner import Spinner
 from miniprophet import ContextManager, Environment, Model
 from miniprophet.agent.default import AgentConfig, DefaultForecastAgent, ForecastResult
 from miniprophet.cli.components.evaluation import print_evaluation
-from miniprophet.cli.components.forecast_results import print_forecast_results
+from miniprophet.cli.components.forecast_results import print_forecast_results, print_rationale
 from miniprophet.cli.components.observation import print_observation
 from miniprophet.cli.components.run_header import print_run_footer, print_run_header
 from miniprophet.cli.components.step_display import print_model_response, print_step_header
@@ -87,6 +87,13 @@ class CliForecastAgent(DefaultForecastAgent):
         print_observation(output)
 
     def on_run_end(self, result: ForecastResult) -> None:
+        # plot a vertical line showing "Agent Submitted"
+        console.rule("[bold red]Forecast Ended[/bold red]", style="red")
+
+        rationale = result.get("rationale", "")
+        if rationale:
+            print_rationale(rationale)
+
         submission = result.get("submission", {})
         if submission:
             print_forecast_results(submission)

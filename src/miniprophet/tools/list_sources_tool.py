@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from miniprophet.environment.source_registry import SourceRegistry
+from miniprophet.environment.source_registry import SourceRegistry, render_source_preview
 
 LIST_SOURCES_SCHEMA = {
     "type": "function",
@@ -52,10 +52,14 @@ class ListSourcesTool:
         lines: list[str] = [f'<sources count="{len(sources)}">']
         for s in sources:
             lines.append(
-                f'<source id="{s["source_id"]}" title="{s["title"]}" '
-                f'date="{s["date"] or "N/A"}" problem_id="{s["problem_id"]}">\n'
-                f"{s['gist']}\n"
-                f"</source>"
+                render_source_preview(
+                    source_id=s["source_id"],
+                    title=s["title"],
+                    url=s["url"],
+                    date=s["date"],
+                    gist=s["gist"],
+                    problem_id=s["problem_id"],
+                )
             )
         lines.append("</sources>")
         return {"output": "\n".join(lines)}

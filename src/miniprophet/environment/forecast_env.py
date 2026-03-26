@@ -22,6 +22,7 @@ def create_default_tools(
 ) -> list[Tool]:
     """Build the standard set of forecast tools sharing a common SourceRegistry."""
     from miniprophet.tools.list_sources_tool import ListSourcesTool
+    from miniprophet.tools.read_source_tool import ReadSourceTool
     from miniprophet.tools.search_tool import SearchForecastTool, SearchToolConfig
     from miniprophet.tools.submit import SubmitTool
 
@@ -36,6 +37,7 @@ def create_default_tools(
             search_limit=search_limit,
             config=search_config,
         ),
+        ReadSourceTool(registry=registry),
         ListSourcesTool(registry=registry),
         SubmitTool(registry=registry),
     ]
