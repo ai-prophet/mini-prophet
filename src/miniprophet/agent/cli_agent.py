@@ -87,13 +87,16 @@ class CliForecastAgent(DefaultForecastAgent):
         print_observation(output)
 
     def on_run_end(self, result: ForecastResult) -> None:
-        submission = result.get("submission", {})
-        if submission:
-            print_forecast_results(submission)
+        # plot a vertical line showing "Agent Submitted"
+        console.rule("[bold red]Forecast Ended[/bold red]", style="red")
 
         rationale = result.get("rationale", "")
         if rationale:
             print_rationale(rationale)
+
+        submission = result.get("submission", {})
+        if submission:
+            print_forecast_results(submission)
 
         evaluation = result.get("evaluation", {})
         if evaluation:
