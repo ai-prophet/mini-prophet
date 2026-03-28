@@ -4,8 +4,7 @@ import asyncio
 
 import pytest
 
-from miniprophet.environment.source_board import Source
-from miniprophet.environment.source_registry import SourceRegistry
+from miniprophet.environment.source_registry import Source, SourceRegistry
 from miniprophet.exceptions import Submitted
 from miniprophet.tools.submit import SubmitTool
 

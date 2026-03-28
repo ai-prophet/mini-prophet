@@ -10,7 +10,7 @@ from rich.table import Table
 from rich.text import Text
 
 from miniprophet.cli.utils import get_console
-from miniprophet.environment.source_board import Source
+from miniprophet.environment.source_registry import Source
 
 console = get_console()
 

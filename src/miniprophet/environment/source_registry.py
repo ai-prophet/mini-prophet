@@ -6,7 +6,15 @@ import asyncio
 from dataclasses import dataclass
 from typing import Any
 
-from miniprophet.environment.source_board import Source
+
+@dataclass
+class Source:
+    """A single search result returned by a search tool."""
+
+    url: str
+    title: str
+    snippet: str
+    date: str | None = None
 
 
 def truncate_at_word_boundary(text: str, max_chars: int) -> str:

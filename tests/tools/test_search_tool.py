@@ -5,8 +5,7 @@ import asyncio
 import pytest
 from conftest import DummySearchTool
 
-from miniprophet.environment.source_board import Source
-from miniprophet.environment.source_registry import SourceRegistry
+from miniprophet.environment.source_registry import Source, SourceRegistry
 from miniprophet.exceptions import SearchAuthError, SearchNetworkError
 from miniprophet.tools.search_tool import SearchForecastTool
 
