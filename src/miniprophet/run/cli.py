@@ -61,18 +61,12 @@ def main(
     disable_interrupt: bool = typer.Option(
         False, "--disable-interrupt", help="Disable Ctrl+C pause-and-inject during agent run."
     ),
+    no_tui: bool = typer.Option(False, "--no-tui", help="Disable TUI; use plain console output."),
 ) -> None:
     """Run the forecasting agent on a binary yes/no question."""
-    from miniprophet.agent.cli_agent import CliForecastAgent
-    from miniprophet.agent.context import get_context_manager
     from miniprophet.config import get_config_from_spec
-    from miniprophet.environment.forecast_env import ForecastEnvironment, create_default_tools
-    from miniprophet.environment.source_registry import SourceRegistry
-    from miniprophet.models import get_model
-    from miniprophet.tools.search import get_search_backend
     from miniprophet.utils.metrics import normalize_ground_truth
 
-    print_cli_banner(__version__, mode_label="single run")
     # ---- Load and merge configs ----
     configs = [get_config_from_spec("default")]
     for spec in config_spec or []:
@@ -99,15 +93,7 @@ def main(
 
     config = recursive_merge(*configs)
 
-    model_cfg = config.get("model", {})
-    search_cfg_top = config.get("search", {})
-    print_run_info(
-        model_class=model_cfg.get("model_class", "litellm"),
-        model_name=model_cfg.get("model_name", ""),
-        search_class=search_cfg_top.get("search_class", "perplexity"),
-    )
-
-    # ---- Resolve title and ground_truth ----
+    # ---- Resolve ground truth ----
     ground_truth: dict[str, int] | None = None
     if ground_truth_json:
         try:
@@ -123,6 +109,75 @@ def main(
                 raise typer.Exit(1)
         ground_truth = normalize_ground_truth(raw)
 
+    # ---- Route to TUI or legacy ----
+    if no_tui:
+        _run_legacy(config, title, interactive, ground_truth, disable_history, disable_interrupt)
+    else:
+        _run_tui(config, title, ground_truth, disable_history)
+
+
+# ---------------------------------------------------------------------------
+# TUI path
+# ---------------------------------------------------------------------------
+
+
+def _run_tui(
+    config: dict,
+    title: str | None,
+    ground_truth: dict[str, int] | None,
+    disable_history: bool,
+) -> None:
+    """Launch the Textual TUI application."""
+    from miniprophet.tui.app import ForecastApp
+
+    search_cfg = config.get("search", {})
+    runtime_kwargs: dict = {}
+    if search_cfg.get("search_date_before", None):
+        runtime_kwargs["search_date_before"] = search_cfg["search_date_before"]
+    if search_cfg.get("search_date_after", None):
+        runtime_kwargs["search_date_after"] = search_cfg["search_date_after"]
+
+    tui_app = ForecastApp(
+        config=config,
+        initial_title=title,
+        initial_ground_truth=ground_truth,
+        runtime_kwargs=runtime_kwargs,
+        disable_history=disable_history,
+        version=__version__,
+    )
+    tui_app.run()
+
+
+# ---------------------------------------------------------------------------
+# Legacy (non-TUI) path — --no-tui
+# ---------------------------------------------------------------------------
+
+
+def _run_legacy(
+    config: dict,
+    title: str | None,
+    interactive: bool,
+    ground_truth: dict[str, int] | None,
+    disable_history: bool,
+    disable_interrupt: bool,
+) -> None:
+    """Run the forecast with plain console output (no Textual)."""
+    from miniprophet.agent.cli_agent import CliForecastAgent
+    from miniprophet.agent.context import get_context_manager
+    from miniprophet.environment.forecast_env import ForecastEnvironment, create_default_tools
+    from miniprophet.environment.source_registry import SourceRegistry
+    from miniprophet.models import get_model
+    from miniprophet.tools.search import get_search_backend
+
+    print_cli_banner(__version__, mode_label="single run")
+    model_cfg = config.get("model", {})
+    search_cfg_top = config.get("search", {})
+    print_run_info(
+        model_class=model_cfg.get("model_class", "litellm"),
+        model_name=model_cfg.get("model_name", ""),
+        search_class=search_cfg_top.get("search_class", "perplexity"),
+    )
+
     if interactive:
         resolved_title, ground_truth = _interactive_flow(
             prefill_title=title or "",
@@ -136,7 +191,6 @@ def main(
             raise typer.Exit(1)
         resolved_title = title
 
-    # ---- Forecast loop (re-enter setup in interactive mode) ----
     while True:
         model = get_model(config=config.get("model", {}))
 
@@ -160,7 +214,7 @@ def main(
             model=model, env=env, context_manager=ctx_mgr, **config.get("agent", {})
         )
 
-        runtime_kwargs = {}
+        runtime_kwargs: dict = {}
         if search_cfg.get("search_date_before", None):
             runtime_kwargs["search_date_before"] = search_cfg["search_date_before"]
         if search_cfg.get("search_date_after", None):
@@ -197,6 +251,11 @@ def main(
             prefill_title=resolved_title,
             prefill_ground_truth=ground_truth,
         )
+
+
+# ---------------------------------------------------------------------------
+# Interactive setup helpers (legacy path only)
+# ---------------------------------------------------------------------------
 
 
 def _interactive_flow(

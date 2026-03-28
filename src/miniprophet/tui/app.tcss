@@ -1,0 +1,66 @@
+Screen {
+    layout: vertical;
+}
+
+#trace {
+    height: 1fr;
+    scrollbar-size-vertical: 1;
+    padding: 0 1;
+}
+
+/* ── Prompt area (docked bottom) ───────────────────────────── */
+
+PromptInput {
+    dock: bottom;
+    height: auto;
+    max-height: 12;
+    padding: 0 1;
+    /* margin-top gives breathing room between the trace and the prompt */
+    margin: 1 0 0 0;
+}
+
+.prompt-container {
+    height: auto;
+    /* start transparent; highlight on focus like toad */
+    border: tall transparent;
+    margin: 0 0 1 0;
+    &:dark {
+        background: black 10%;
+    }
+    &:light {
+        background: white 40%;
+    }
+    &:focus-within {
+        border: tall $secondary;
+        #prompt-symbol {
+            text-opacity: 100%;
+        }
+    }
+}
+
+#prompt-symbol {
+    width: auto;
+    height: 1;
+    color: $secondary;
+    padding: 0 1;
+    text-opacity: 40%;
+}
+
+#prompt-textarea {
+    height: auto;
+    max-height: 8;
+    min-height: 1;
+    border: none;
+    background: transparent;
+    /* left gap from the ❯, right breathing room */
+    padding: 0 1 0 0;
+    &:blur {
+        text-opacity: 0.5;
+    }
+}
+
+#status-line {
+    height: 1;
+    padding: 0 2;
+    color: $text-muted;
+}
