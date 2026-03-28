@@ -8,8 +8,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from miniprophet.environment.source_board import Source
-from miniprophet.environment.source_registry import SourceRegistry, render_source_preview
+from miniprophet.environment.source_registry import Source, SourceRegistry, render_source_preview
 from miniprophet.exceptions import SearchAuthError, SearchError
 from miniprophet.tools.search import SearchBackend, SearchResult
 

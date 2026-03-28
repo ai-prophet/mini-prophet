@@ -37,7 +37,6 @@ class AgentConfig(BaseModel):
     step_limit: int = 30
     cost_limit: float = 3.0
     search_limit: int = 10
-    context_window: int = 6
     output_path: Path | None = None
     show_current_time: bool = False
     enable_grace_period: bool = False

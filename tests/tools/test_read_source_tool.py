@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import asyncio
 
-from miniprophet.environment.source_board import Source
-from miniprophet.environment.source_registry import SourceRegistry
+from miniprophet.environment.source_registry import Source, SourceRegistry
 from miniprophet.tools.read_source_tool import ReadSourceTool
 
 

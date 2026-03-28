@@ -14,7 +14,7 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from miniprophet.environment.source_board import Source  # noqa: E402
+from miniprophet.environment.source_registry import Source  # noqa: E402
 from miniprophet.tools.search import SearchResult  # noqa: E402
 
 

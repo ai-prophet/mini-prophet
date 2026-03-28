@@ -14,7 +14,7 @@ from typing import Any, Literal
 from tavily import TavilyClient
 from tavily.errors import InvalidAPIKeyError, MissingAPIKeyError, UsageLimitExceededError
 
-from miniprophet.environment.source_board import Source
+from miniprophet.environment.source_registry import Source
 from miniprophet.exceptions import SearchAuthError, SearchNetworkError, SearchRateLimitError
 from miniprophet.tools.search import SearchResult
 

@@ -21,7 +21,7 @@ Implement the `SearchBackend` protocol (`search`, `serialize`). The `search` met
 must be `async`.
 
 ```python
-from miniprophet.environment.source_board import Source
+from miniprophet.environment.source_registry import Source
 from miniprophet.tools.search import SearchResult
 
 class MySearchBackend:

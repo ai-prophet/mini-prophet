@@ -13,7 +13,7 @@ from typing import Any
 
 from exa_py import Exa
 
-from miniprophet.environment.source_board import Source
+from miniprophet.environment.source_registry import Source
 from miniprophet.exceptions import SearchAuthError, SearchNetworkError, SearchRateLimitError
 from miniprophet.tools.search import SearchResult
 

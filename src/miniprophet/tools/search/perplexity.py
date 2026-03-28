@@ -14,7 +14,7 @@ from typing import Any
 
 from perplexity import Perplexity
 
-from miniprophet.environment.source_board import Source
+from miniprophet.environment.source_registry import Source
 from miniprophet.exceptions import (
     SearchAuthError,
     SearchNetworkError,

@@ -4,8 +4,7 @@ import asyncio
 
 import pytest
 
-from miniprophet.environment.source_board import Source
-from miniprophet.environment.source_registry import SourceRegistry
+from miniprophet.environment.source_registry import Source, SourceRegistry
 
 
 def _make_source(title: str = "T", snippet: str = "short snippet") -> Source:

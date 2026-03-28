@@ -6,8 +6,7 @@ import json
 from conftest import DummySearchTool
 
 from miniprophet.environment.forecast_env import ForecastEnvironment, create_default_tools
-from miniprophet.environment.source_board import Source
-from miniprophet.environment.source_registry import SourceRegistry
+from miniprophet.environment.source_registry import Source, SourceRegistry
 from miniprophet.tools.search_tool import SearchForecastTool
 
 

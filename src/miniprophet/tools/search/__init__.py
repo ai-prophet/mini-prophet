@@ -7,7 +7,7 @@ import inspect
 from dataclasses import dataclass
 from typing import Protocol
 
-from miniprophet.environment.source_board import Source
+from miniprophet.environment.source_registry import Source
 
 
 @dataclass
