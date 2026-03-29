@@ -123,13 +123,13 @@ git checkout dev
 pip install -e ".[perplexity]"
 
 # Run with planning enabled (default on dev)
-prophet run --no-tui \
+prophet run \
   --title "Will the Lakers beat the Warriors tomorrow night?" \
   --model-class openrouter \
   --model gemini/gemini-3-flash-preview
 
 # Planning is on by default. To disable it:
-prophet run --no-tui \
+prophet run \
   --title "Will it rain in SF tomorrow?" \
   -c planning.enabled=false
 ```
