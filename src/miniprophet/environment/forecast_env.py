@@ -43,20 +43,53 @@ def create_default_tools(
     ]
 
 
+def create_planning_tools(
+    *,
+    ask_user_callback: Any = None,
+) -> list[Tool]:
+    """Build the planning-phase tool set (submit_plan + ask_user)."""
+    from miniprophet.tools.ask_user import AskUserTool
+    from miniprophet.tools.submit_plan import SubmitPlanTool
+
+    return [
+        SubmitPlanTool(),
+        AskUserTool(callback=ask_user_callback),
+    ]
+
+
 class ForecastEnvironment:
-    """Dispatches tool-call actions to registered Tool instances."""
+    """Dispatches tool-call actions to registered Tool instances.
+
+    Supports named tool sets (e.g. ``"execution"`` and ``"planning"``) that
+    can be switched at runtime via :meth:`set_active_tools`.
+    """
 
     def __init__(
         self,
         tools: list[Tool],
         *,
+        planning_tools: list[Tool] | None = None,
         registry: SourceRegistry | None = None,
         **kwargs: Any,
     ) -> None:
         if registry is None:
             registry = SourceRegistry()
         self.registry = registry
-        self._tools: dict[str, Tool] = {t.name: t for t in tools}
+        self._tool_sets: dict[str, dict[str, Tool]] = {
+            "execution": {t.name: t for t in tools},
+        }
+        if planning_tools:
+            self._tool_sets["planning"] = {t.name: t for t in planning_tools}
+        self._active_set = "execution"
+        self._tools: dict[str, Tool] = self._tool_sets[self._active_set]
+
+    def set_active_tools(self, name: str) -> None:
+        """Switch the active tool set (e.g. ``'planning'`` or ``'execution'``)."""
+        self._tools = self._tool_sets[name]
+        self._active_set = name
+
+    def get_active_tool_set(self) -> str:
+        return self._active_set
 
     async def execute(self, action: dict, **kwargs) -> dict:
         tool_name = action.get("name", "")

@@ -11,6 +11,10 @@ class ConsoleProxy:
     All attribute access is forwarded to an inner ``_target`` which defaults
     to a normal :class:`Console`.  Call :func:`set_console_target` to swap the
     target (e.g. to a :class:`TuiConsole` that writes into a Textual widget).
+
+    Python looks up dunder/special methods on the *type*, not the instance,
+    so ``__getattr__`` cannot intercept them.  We explicitly delegate the ones
+    that Rich's ``Console`` (and ``Live``) rely on.
     """
 
     def __init__(self) -> None:
@@ -24,6 +28,17 @@ class ConsoleProxy:
             object.__setattr__(self, name, value)
         else:
             setattr(self._target, name, value)
+
+    # -- dunder methods that must be forwarded explicitly --
+
+    def __enter__(self):
+        return self._target.__enter__()
+
+    def __exit__(self, *args):
+        return self._target.__exit__(*args)
+
+    def __repr__(self) -> str:
+        return repr(self._target)
 
 
 _console: ConsoleProxy | None = None
