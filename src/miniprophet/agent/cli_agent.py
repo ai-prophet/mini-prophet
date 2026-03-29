@@ -116,6 +116,50 @@ class CliForecastAgent(DefaultForecastAgent):
         )
 
     # ------------------------------------------------------------------
+    # Planning hooks
+    # ------------------------------------------------------------------
+
+    def on_planning_start(self, title: str) -> None:
+        console.rule("[bold magenta]Planning Phase[/bold magenta]", style="magenta")
+        console.print(f"  Planning research strategy for: [bold]{title}[/bold]\n")
+
+    def on_plan_display(self, plan) -> None:
+        if plan is None:
+            return
+        from miniprophet.planning.display import print_plan
+
+        print_plan(plan)
+
+    def on_planning_end(self, plan_xml: str | None) -> None:
+        if plan_xml:
+            console.rule("[bold green]Plan Approved[/bold green]", style="green")
+        else:
+            console.rule("[bold yellow]No Plan — proceeding without[/bold yellow]", style="yellow")
+        console.print()
+
+    async def _approve_plan(self, plan, plan_xml: str) -> bool:
+        """Interactive plan approval via Rich prompt."""
+        console.print(
+            "  [bold]Type 'approve' to proceed with execution, "
+            "or type feedback to refine the plan.[/bold]"
+        )
+        user_input = Prompt.ask("  [bold cyan]Response[/bold cyan]", default="approve")
+
+        if user_input.strip().lower() == "approve":
+            return True
+
+        self.add_messages(
+            self.model.format_message(
+                role="user",
+                content=(
+                    f"User feedback on the plan:\n{user_input.strip()}\n\n"
+                    "Please revise the plan based on this feedback and resubmit."
+                ),
+            )
+        )
+        return False
+
+    # ------------------------------------------------------------------
     # Interactive interrupt: signal handling
     # ------------------------------------------------------------------
 

@@ -61,7 +61,7 @@ def main(
     disable_interrupt: bool = typer.Option(
         False, "--disable-interrupt", help="Disable Ctrl+C pause-and-inject during agent run."
     ),
-    no_tui: bool = typer.Option(False, "--no-tui", help="Disable TUI; use plain console output."),
+    tui: bool = typer.Option(False, "--tui", help="Use Textual TUI instead of plain console."),
 ) -> None:
     """Run the forecasting agent on a binary yes/no question."""
     from miniprophet.config import get_config_from_spec
@@ -110,10 +110,10 @@ def main(
         ground_truth = normalize_ground_truth(raw)
 
     # ---- Route to TUI or legacy ----
-    if no_tui:
-        _run_legacy(config, title, interactive, ground_truth, disable_history, disable_interrupt)
-    else:
+    if tui:
         _run_tui(config, title, ground_truth, disable_history)
+    else:
+        _run_legacy(config, title, interactive, ground_truth, disable_history, disable_interrupt)
 
 
 # ---------------------------------------------------------------------------
@@ -164,7 +164,11 @@ def _run_legacy(
     """Run the forecast with plain console output (no Textual)."""
     from miniprophet.agent.cli_agent import CliForecastAgent
     from miniprophet.agent.context import get_context_manager
-    from miniprophet.environment.forecast_env import ForecastEnvironment, create_default_tools
+    from miniprophet.environment.forecast_env import (
+        ForecastEnvironment,
+        create_default_tools,
+        create_planning_tools,
+    )
     from miniprophet.environment.source_registry import SourceRegistry
     from miniprophet.models import get_model
     from miniprophet.tools.search import get_search_backend
@@ -191,6 +195,11 @@ def _run_legacy(
             raise typer.Exit(1)
         resolved_title = title
 
+    # AskUser callback for CLI
+    async def cli_ask_user(question: str) -> str:
+        console.print(f"\n  [bold cyan]Agent asks:[/bold cyan] {question}")
+        return Prompt.ask("  [bold cyan]Your answer[/bold cyan]", default="")
+
     while True:
         model = get_model(config=config.get("model", {}))
 
@@ -206,7 +215,8 @@ def _run_legacy(
             search_limit=agent_search_limit,
             search_results_limit=search_cfg.get("search_results_limit", 5),
         )
-        env = ForecastEnvironment(tools, registry=registry)
+        planning_tools = create_planning_tools(ask_user_callback=cli_ask_user)
+        env = ForecastEnvironment(tools, planning_tools=planning_tools, registry=registry)
 
         cm_cfg = config.get("context_manager", {})
         ctx_mgr = get_context_manager(cm_cfg)

@@ -20,6 +20,14 @@ class Submitted(InterruptAgentFlow):
     """Raised when the agent submits a forecast -- terminates the loop."""
 
 
+class PlanSubmitted(InterruptAgentFlow):
+    """Raised when the agent submits a validated plan -- terminates the planning loop."""
+
+    def __init__(self, plan_xml: str, *messages: dict):
+        self.plan_xml = plan_xml
+        super().__init__(*messages)
+
+
 class LimitsExceeded(InterruptAgentFlow):
     """Raised when step, cost, or search limits are exceeded."""
 

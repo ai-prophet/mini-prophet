@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import queue
 from collections.abc import Callable
 from typing import Any
@@ -58,6 +59,39 @@ class TuiForecastAgent(CliForecastAgent):
     def on_run_end(self, result: ForecastResult) -> None:
         super().on_run_end(result)
         self._on_status("")
+
+    # ------------------------------------------------------------------
+    # Planning: TUI-based plan approval via message queue
+    # ------------------------------------------------------------------
+
+    async def _approve_plan(self, plan, plan_xml: str) -> bool:
+        console = get_console()
+        console.print(
+            "  [bold]Type 'approve' to proceed, or type feedback to refine the plan.[/bold]"
+        )
+        self._on_status("Plan ready — type 'approve' or give feedback")
+
+        # Wait for user input via the message queue
+        try:
+            response = await asyncio.wait_for(self._message_queue.get(), timeout=600)
+        except TimeoutError:
+            console.print("  [dim]No response. Auto-approving plan.[/dim]")
+            return True
+
+        if response.strip().lower() == "approve":
+            return True
+
+        self.add_messages(
+            self.model.format_message(
+                role="user",
+                content=(
+                    f"User feedback on the plan:\n{response.strip()}\n\n"
+                    "Please revise the plan based on this feedback and resubmit."
+                ),
+            )
+        )
+        self._on_status("\u23f3 Revising plan...")
+        return False
 
     # ------------------------------------------------------------------
     # Override run: skip SIGINT handler

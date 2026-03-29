@@ -177,7 +177,11 @@ class ForecastApp(App):
         """
         from miniprophet.agent.context import get_context_manager
         from miniprophet.agent.tui_agent import TuiForecastAgent
-        from miniprophet.environment.forecast_env import ForecastEnvironment, create_default_tools
+        from miniprophet.environment.forecast_env import (
+            ForecastEnvironment,
+            create_default_tools,
+            create_planning_tools,
+        )
         from miniprophet.environment.source_registry import SourceRegistry
         from miniprophet.models import get_model
         from miniprophet.tools.search import get_search_backend
@@ -196,7 +200,21 @@ class ForecastApp(App):
             search_limit=agent_search_limit,
             search_results_limit=search_cfg.get("search_results_limit", 5),
         )
-        env = ForecastEnvironment(tools, registry=registry)
+
+        # AskUser callback: posts question, waits for user input via queue
+        async def _tui_ask_user(question: str) -> str:
+            from miniprophet.cli.utils import get_console as _get_console
+
+            console = _get_console()
+            console.print(f"\n  [bold cyan]Agent asks:[/bold cyan] {question}")
+            self.call_from_thread(self._set_status, "Agent is asking a question — type your answer")
+            try:
+                return self._interrupt_queue.get(timeout=300)
+            except Exception:
+                return "(No response from user — timed out)"
+
+        planning_tools = create_planning_tools(ask_user_callback=_tui_ask_user)
+        env = ForecastEnvironment(tools, planning_tools=planning_tools, registry=registry)
 
         cm_cfg = self._config.get("context_manager", {})
         ctx_mgr = get_context_manager(cm_cfg)
