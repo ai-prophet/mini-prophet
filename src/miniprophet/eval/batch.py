@@ -88,7 +88,7 @@ async def _process_problem(
     """Process one problem. Returns (result, done). done=False means retry."""
     from miniprophet.agent.context import get_context_manager
     from miniprophet.environment.forecast_env import ForecastEnvironment, create_default_tools
-    from miniprophet.environment.source_board import SourceBoard
+    from miniprophet.environment.source_registry import SourceRegistry
 
     task_id = problem.task_id
     result = ForecastResult(task_id=task_id, title=problem.title)
@@ -109,16 +109,15 @@ async def _process_problem(
         search_cfg = config.get("search", {})
         agent_cfg = config.get("agent", {})
         agent_search_limit = int(agent_cfg.get("search_limit", 10) or 10)
-        board = SourceBoard()
+        max_gist = int(search_cfg.get("max_source_display_chars", 200) or 200)
+        registry = SourceRegistry(max_gist_chars=max_gist)
         tools = create_default_tools(
             search_tool=search_backend,
-            outcomes=problem.outcomes,
-            board=board,
+            registry=registry,
             search_limit=agent_search_limit,
             search_results_limit=search_cfg.get("search_results_limit", 5),
-            max_source_display_chars=search_cfg.get("max_source_display_chars", 2000),
         )
-        env = ForecastEnvironment(tools, board=board)
+        env = ForecastEnvironment(tools, registry=registry)
 
         cm_cfg = config.get("context_manager", {})
         ctx_mgr = get_context_manager(cm_cfg)
@@ -147,7 +146,6 @@ async def _process_problem(
         forecast = await asyncio.wait_for(
             agent.run(
                 title=problem.title,
-                outcomes=problem.outcomes,
                 ground_truth=problem.ground_truth,
                 **runtime_kwargs,
             ),

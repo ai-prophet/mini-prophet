@@ -22,7 +22,6 @@ console = get_console()
 class HistoryEntry(TypedDict):
     timestamp: str
     title: str
-    outcomes: list[str]
     ground_truth: dict[str, int] | None
     submission: dict[str, float]
     model_name: str
@@ -31,7 +30,6 @@ class HistoryEntry(TypedDict):
 
 def append_history(
     title: str,
-    outcomes: list[str],
     ground_truth: dict[str, int] | None,
     submission: dict[str, float],
     model_name: str,
@@ -41,7 +39,6 @@ def append_history(
     entry: HistoryEntry = {
         "timestamp": datetime.now(UTC).isoformat(),
         "title": title,
-        "outcomes": outcomes,
         "ground_truth": ground_truth,
         "submission": submission,
         "model_name": model_name,
@@ -72,7 +69,7 @@ def load_history() -> list[HistoryEntry]:
 PAGE_SIZE = 10
 
 
-def browse_history_interactive() -> tuple[str, list[str], dict[str, int] | None] | None:
+def browse_history_interactive() -> tuple[str, dict[str, int] | None] | None:
     """Show a paginated table of forecast history. Returns selected entry data or None."""
     entries = load_history()
     if not entries:
@@ -89,7 +86,6 @@ def browse_history_interactive() -> tuple[str, list[str], dict[str, int] | None]
         table = Table(title=f"Forecast History (page {page + 1}/{total_pages})", expand=False)
         table.add_column("#", style="bold", justify="right")
         table.add_column("Title", max_width=40)
-        table.add_column("Outcomes")
         table.add_column("Ground Truth")
         table.add_column("Timestamp")
 
@@ -101,7 +97,6 @@ def browse_history_interactive() -> tuple[str, list[str], dict[str, int] | None]
             table.add_row(
                 str(global_idx),
                 entry.get("title", ""),
-                ", ".join(entry.get("outcomes", [])),
                 gt_str,
                 ts,
             )
@@ -137,7 +132,6 @@ def browse_history_interactive() -> tuple[str, list[str], dict[str, int] | None]
                 console.print(f"  [green]Selected:[/green] {selected.get('title', '')}")
                 return (
                     selected.get("title", ""),
-                    selected.get("outcomes", []),
                     selected.get("ground_truth"),
                 )
             else:

@@ -22,7 +22,7 @@ class ForecastProblem:
 
     task_id: str
     title: str
-    outcomes: list[str]
+    outcomes: list[str] = field(default_factory=lambda: ["Yes", "No"])
     ground_truth: dict[str, int] | None = None
     predict_by: str | None = None
     context: str | None = None

@@ -49,9 +49,10 @@ def test_load_problems_validates_schema_and_extra_fields(tmp_path: Path) -> None
     assert problems[0].metadata["_extra_fields"]["random_col"] == "kept"
 
 
-def test_load_problems_requires_outcomes(tmp_path: Path) -> None:
-    path = tmp_path / "bad.jsonl"
-    path.write_text(json.dumps({"title": "Missing outcomes"}) + "\n")
+def test_load_problems_defaults_outcomes_to_binary(tmp_path: Path) -> None:
+    """Outcomes default to ["Yes", "No"] when not specified."""
+    path = tmp_path / "binary.jsonl"
+    path.write_text(json.dumps({"title": "Will it rain?"}) + "\n")
 
-    with pytest.raises(ValueError, match="invalid task schema"):
-        load_problems(path)
+    problems = load_problems(path)
+    assert problems[0].outcomes == ["Yes", "No"]

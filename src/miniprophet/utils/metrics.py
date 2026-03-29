@@ -42,22 +42,59 @@ def get_metrics() -> dict[str, Metric]:
 register_metric(BrierScore())
 
 
-def validate_ground_truth(outcomes: list[str], ground_truth: dict[str, int]) -> None:
-    """Raise ValueError if ground_truth doesn't match outcomes."""
-    gt_keys = set(ground_truth.keys())
-    outcome_set = set(outcomes)
-    missing = outcome_set - gt_keys
-    extra = gt_keys - outcome_set
-    errors: list[str] = []
-    if missing:
-        errors.append(f"Missing outcomes in ground_truth: {missing}")
-    if extra:
-        errors.append(f"Unknown outcomes in ground_truth: {extra}")
+def normalize_ground_truth(raw: dict[str, int] | int | float) -> dict[str, int]:
+    """Normalize various ground truth formats to {"Yes": 0|1, "No": 0|1}.
+
+    Accepts:
+    - int or float (0 or 1)
+    - dict with case-insensitive "Yes" key (e.g. {"yes": 1}, {"YES": 0})
+    - dict with both "Yes" and "No" keys (validated as complementary)
+    """
+    if isinstance(raw, int | float):
+        if raw not in (0, 1, 0.0, 1.0):
+            raise ValueError(f"Ground truth must be 0 or 1, got {raw}")
+        v = int(raw)
+        return {"Yes": v, "No": 1 - v}
+
+    if not isinstance(raw, dict):
+        raise ValueError(f"Ground truth must be int, float, or dict, got {type(raw).__name__}")
+
+    normalized: dict[str, int] = {}
+    for key, val in raw.items():
+        k = key.strip().capitalize()
+        if k not in ("Yes", "No"):
+            raise ValueError(f"Ground truth key must be 'Yes' or 'No', got '{key}'")
+        if val not in (0, 1):
+            raise ValueError(f"Ground truth value for '{key}' must be 0 or 1, got {val}")
+        normalized[k] = val
+
+    if "Yes" not in normalized:
+        raise ValueError("Ground truth must include 'Yes' key")
+
+    if "No" not in normalized:
+        normalized["No"] = 1 - normalized["Yes"]
+    elif normalized["Yes"] + normalized["No"] != 1:
+        raise ValueError(
+            f"Ground truth values must be complementary (sum to 1), "
+            f"got Yes={normalized['Yes']}, No={normalized['No']}"
+        )
+
+    return normalized
+
+
+def validate_ground_truth(ground_truth: dict[str, int]) -> None:
+    """Validate that ground_truth is a valid binary ground truth dict (already normalized)."""
+    if not isinstance(ground_truth, dict):
+        raise ValueError("ground_truth must be a dict")
+    if set(ground_truth.keys()) != {"Yes", "No"}:
+        raise ValueError(
+            f"ground_truth keys must be {{'Yes', 'No'}}, got {set(ground_truth.keys())}"
+        )
     for key, val in ground_truth.items():
         if val not in (0, 1):
-            errors.append(f"ground_truth['{key}'] must be 0 or 1, got {val}")
-    if errors:
-        raise ValueError("Invalid ground_truth: " + "; ".join(errors))
+            raise ValueError(f"ground_truth['{key}'] must be 0 or 1, got {val}")
+    if ground_truth["Yes"] + ground_truth["No"] != 1:
+        raise ValueError("ground_truth values must be complementary")
 
 
 def evaluate_submission(

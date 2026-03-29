@@ -11,7 +11,7 @@ from rich.spinner import Spinner
 from miniprophet import ContextManager, Environment, Model
 from miniprophet.agent.default import AgentConfig, DefaultForecastAgent, ForecastResult
 from miniprophet.cli.components.evaluation import print_evaluation
-from miniprophet.cli.components.forecast_results import print_forecast_results
+from miniprophet.cli.components.forecast_results import print_forecast_results, print_rationale
 from miniprophet.cli.components.observation import print_observation
 from miniprophet.cli.components.run_header import print_run_footer, print_run_header
 from miniprophet.cli.components.step_display import print_model_response, print_step_header
@@ -53,8 +53,8 @@ class CliForecastAgent(DefaultForecastAgent):
     # Hook overrides
     # ------------------------------------------------------------------
 
-    def on_run_start(self, title: str, outcomes: str, config: AgentConfig) -> None:
-        print_run_header(title, outcomes, config.step_limit, config.cost_limit, config.search_limit)
+    def on_run_start(self, title: str, config: AgentConfig) -> None:
+        print_run_header(title, config.step_limit, config.cost_limit, config.search_limit)
 
     def on_step_start(self) -> None:
         print_step_header(
@@ -87,6 +87,13 @@ class CliForecastAgent(DefaultForecastAgent):
         print_observation(output)
 
     def on_run_end(self, result: ForecastResult) -> None:
+        # plot a vertical line showing "Agent Submitted"
+        console.rule("[bold red]Forecast Ended[/bold red]", style="red")
+
+        rationale = result.get("rationale", "")
+        if rationale:
+            print_rationale(rationale)
+
         submission = result.get("submission", {})
         if submission:
             print_forecast_results(submission)
@@ -107,6 +114,50 @@ class CliForecastAgent(DefaultForecastAgent):
             total_prompt_tokens=self.total_prompt_tokens,
             total_cached_tokens=self.total_cached_tokens,
         )
+
+    # ------------------------------------------------------------------
+    # Planning hooks
+    # ------------------------------------------------------------------
+
+    def on_planning_start(self, title: str) -> None:
+        console.rule("[bold magenta]Planning Phase[/bold magenta]", style="magenta")
+        console.print(f"  Planning research strategy for: [bold]{title}[/bold]\n")
+
+    def on_plan_display(self, plan) -> None:
+        if plan is None:
+            return
+        from miniprophet.planning.display import print_plan
+
+        print_plan(plan)
+
+    def on_planning_end(self, plan_xml: str | None) -> None:
+        if plan_xml:
+            console.rule("[bold green]Plan Approved[/bold green]", style="green")
+        else:
+            console.rule("[bold yellow]No Plan — proceeding without[/bold yellow]", style="yellow")
+        console.print()
+
+    async def _approve_plan(self, plan, plan_xml: str) -> bool:
+        """Interactive plan approval via Rich prompt."""
+        console.print(
+            "  [bold]Type 'approve' to proceed with execution, "
+            "or type feedback to refine the plan.[/bold]"
+        )
+        user_input = Prompt.ask("  [bold cyan]Response[/bold cyan]", default="approve")
+
+        if user_input.strip().lower() == "approve":
+            return True
+
+        self.add_messages(
+            self.model.format_message(
+                role="user",
+                content=(
+                    f"User feedback on the plan:\n{user_input.strip()}\n\n"
+                    "Please revise the plan based on this feedback and resubmit."
+                ),
+            )
+        )
+        return False
 
     # ------------------------------------------------------------------
     # Interactive interrupt: signal handling
@@ -172,7 +223,6 @@ class CliForecastAgent(DefaultForecastAgent):
     async def run(
         self,
         title: str,
-        outcomes: list[str],
         ground_truth: dict[str, int] | None = None,
         **runtime_kwargs,
     ) -> ForecastResult:
@@ -181,7 +231,7 @@ class CliForecastAgent(DefaultForecastAgent):
             self._original_sigint_handler = signal.getsignal(signal.SIGINT)
             signal.signal(signal.SIGINT, self._handle_sigint)
         try:
-            return await super().run(title, outcomes, ground_truth, **runtime_kwargs)
+            return await super().run(title, ground_truth, **runtime_kwargs)
         finally:
             if self._original_sigint_handler is not None:
                 signal.signal(signal.SIGINT, self._original_sigint_handler)

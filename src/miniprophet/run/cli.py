@@ -24,14 +24,11 @@ console = get_console()
 @app.callback(invoke_without_command=True)
 def main(
     title: str | None = typer.Option(None, "--title", "-t", help="The forecasting question."),
-    outcomes: str | None = typer.Option(
-        None, "--outcomes", "-o", help="Comma-separated list of possible outcomes."
-    ),
     ground_truth_json: str | None = typer.Option(
         None,
         "--ground-truth",
         "-g",
-        help='Ground truth as JSON, e.g. \'{"Yes": 1, "No": 0}\'.',
+        help="Ground truth: 0 or 1, or JSON like '{\"Yes\": 1}'.",
     ),
     interactive: bool = typer.Option(False, "--interactive", "-i", help="Enter interactive mode."),
     model_name: str | None = typer.Option(
@@ -64,17 +61,12 @@ def main(
     disable_interrupt: bool = typer.Option(
         False, "--disable-interrupt", help="Disable Ctrl+C pause-and-inject during agent run."
     ),
+    tui: bool = typer.Option(False, "--tui", help="Use Textual TUI instead of plain console."),
 ) -> None:
-    """Run the forecasting agent on a question with specified outcomes."""
-    from miniprophet.agent.cli_agent import CliForecastAgent
-    from miniprophet.agent.context import get_context_manager
+    """Run the forecasting agent on a binary yes/no question."""
     from miniprophet.config import get_config_from_spec
-    from miniprophet.environment.forecast_env import ForecastEnvironment, create_default_tools
-    from miniprophet.environment.source_board import SourceBoard
-    from miniprophet.models import get_model
-    from miniprophet.tools.search import get_search_backend
+    from miniprophet.utils.metrics import normalize_ground_truth
 
-    print_cli_banner(__version__, mode_label="single run")
     # ---- Load and merge configs ----
     configs = [get_config_from_spec("default")]
     for spec in config_spec or []:
@@ -101,6 +93,87 @@ def main(
 
     config = recursive_merge(*configs)
 
+    # ---- Resolve ground truth ----
+    ground_truth: dict[str, int] | None = None
+    if ground_truth_json:
+        try:
+            raw = json.loads(ground_truth_json)
+        except json.JSONDecodeError:
+            # Accept bare 0 or 1
+            if ground_truth_json.strip() in ("0", "1"):
+                raw = int(ground_truth_json.strip())
+            else:
+                console.print(
+                    f"[bold red]Error:[/bold red] Invalid --ground-truth: {ground_truth_json}"
+                )
+                raise typer.Exit(1)
+        ground_truth = normalize_ground_truth(raw)
+
+    # ---- Route to TUI or legacy ----
+    if tui:
+        _run_tui(config, title, ground_truth, disable_history)
+    else:
+        _run_legacy(config, title, interactive, ground_truth, disable_history, disable_interrupt)
+
+
+# ---------------------------------------------------------------------------
+# TUI path
+# ---------------------------------------------------------------------------
+
+
+def _run_tui(
+    config: dict,
+    title: str | None,
+    ground_truth: dict[str, int] | None,
+    disable_history: bool,
+) -> None:
+    """Launch the Textual TUI application."""
+    from miniprophet.tui.app import ForecastApp
+
+    search_cfg = config.get("search", {})
+    runtime_kwargs: dict = {}
+    if search_cfg.get("search_date_before", None):
+        runtime_kwargs["search_date_before"] = search_cfg["search_date_before"]
+    if search_cfg.get("search_date_after", None):
+        runtime_kwargs["search_date_after"] = search_cfg["search_date_after"]
+
+    tui_app = ForecastApp(
+        config=config,
+        initial_title=title,
+        initial_ground_truth=ground_truth,
+        runtime_kwargs=runtime_kwargs,
+        disable_history=disable_history,
+        version=__version__,
+    )
+    tui_app.run()
+
+
+# ---------------------------------------------------------------------------
+# Legacy (non-TUI) path — default
+# ---------------------------------------------------------------------------
+
+
+def _run_legacy(
+    config: dict,
+    title: str | None,
+    interactive: bool,
+    ground_truth: dict[str, int] | None,
+    disable_history: bool,
+    disable_interrupt: bool,
+) -> None:
+    """Run the forecast with plain console output (no Textual)."""
+    from miniprophet.agent.cli_agent import CliForecastAgent
+    from miniprophet.agent.context import get_context_manager
+    from miniprophet.environment.forecast_env import (
+        ForecastEnvironment,
+        create_default_tools,
+        create_planning_tools,
+    )
+    from miniprophet.environment.source_registry import SourceRegistry
+    from miniprophet.models import get_model
+    from miniprophet.tools.search import get_search_backend
+
+    print_cli_banner(__version__, mode_label="single run")
     model_cfg = config.get("model", {})
     search_cfg_top = config.get("search", {})
     print_run_info(
@@ -109,36 +182,24 @@ def main(
         search_class=search_cfg_top.get("search_class", "perplexity"),
     )
 
-    # ---- Resolve title, outcomes, ground_truth ----
-    ground_truth: dict[str, int] | None = None
-    if ground_truth_json:
-        try:
-            ground_truth = json.loads(ground_truth_json)
-        except json.JSONDecodeError as exc:
-            console.print(f"[bold red]Error:[/bold red] Invalid --ground-truth JSON: {exc}")
-            raise typer.Exit(1)
-
     if interactive:
-        resolved_title, outcome_list, ground_truth = _interactive_flow(
+        resolved_title, ground_truth = _interactive_flow(
             prefill_title=title or "",
-            prefill_outcomes=outcomes,
             prefill_ground_truth=ground_truth,
         )
     else:
-        if not title or not outcomes:
+        if not title:
             console.print(
-                "[bold red]Error:[/bold red] --title and --outcomes are required "
-                "(or use --interactive / -i)."
+                "[bold red]Error:[/bold red] --title is required (or use --interactive / -i)."
             )
             raise typer.Exit(1)
         resolved_title = title
-        outcome_list = [o.strip() for o in outcomes.split(",") if o.strip()]
 
-    if len(outcome_list) < 2:
-        console.print("[bold red]Error:[/bold red] At least 2 outcomes are required.")
-        raise typer.Exit(1)
+    # AskUser callback for CLI
+    async def cli_ask_user(question: str) -> str:
+        console.print(f"\n  [bold cyan]Agent asks:[/bold cyan] {question}")
+        return Prompt.ask("  [bold cyan]Your answer[/bold cyan]", default="")
 
-    # ---- Forecast loop (re-enter setup in interactive mode) ----
     while True:
         model = get_model(config=config.get("model", {}))
 
@@ -146,16 +207,16 @@ def main(
         search_backend = get_search_backend(search_cfg=search_cfg)
 
         agent_search_limit = config.get("agent", {}).get("search_limit", 10)
-        board = SourceBoard()
+        max_gist = search_cfg.get("max_source_display_chars", 200)
+        registry = SourceRegistry(max_gist_chars=max_gist)
         tools = create_default_tools(
             search_tool=search_backend,
-            outcomes=outcome_list,
-            board=board,
+            registry=registry,
             search_limit=agent_search_limit,
             search_results_limit=search_cfg.get("search_results_limit", 5),
-            max_source_display_chars=search_cfg.get("max_source_display_chars", 2000),
         )
-        env = ForecastEnvironment(tools, board=board)
+        planning_tools = create_planning_tools(ask_user_callback=cli_ask_user)
+        env = ForecastEnvironment(tools, planning_tools=planning_tools, registry=registry)
 
         cm_cfg = config.get("context_manager", {})
         ctx_mgr = get_context_manager(cm_cfg)
@@ -163,15 +224,13 @@ def main(
             model=model, env=env, context_manager=ctx_mgr, **config.get("agent", {})
         )
 
-        runtime_kwargs = {}
+        runtime_kwargs: dict = {}
         if search_cfg.get("search_date_before", None):
             runtime_kwargs["search_date_before"] = search_cfg["search_date_before"]
         if search_cfg.get("search_date_after", None):
             runtime_kwargs["search_date_after"] = search_cfg["search_date_after"]
 
-        result = agent.run_sync(
-            title=resolved_title, outcomes=outcome_list, ground_truth=ground_truth, **runtime_kwargs
-        )
+        result = agent.run_sync(title=resolved_title, ground_truth=ground_truth, **runtime_kwargs)
 
         if result.get("submission") and not disable_history:
             from miniprophet.cli.components.forecast_history import append_history
@@ -179,7 +238,6 @@ def main(
             model_cfg = config.get("model", {})
             append_history(
                 title=resolved_title,
-                outcomes=outcome_list,
                 ground_truth=ground_truth,
                 submission=result["submission"],
                 model_name=model_cfg.get("model_name", ""),
@@ -199,22 +257,21 @@ def main(
         if not Confirm.ask("  [bold]Run another forecast?[/bold]", default=False):
             break
 
-        resolved_title, outcome_list, ground_truth = _interactive_flow(
+        resolved_title, ground_truth = _interactive_flow(
             prefill_title=resolved_title,
-            prefill_outcomes=",".join(outcome_list),
             prefill_ground_truth=ground_truth,
         )
 
-        if len(outcome_list) < 2:
-            console.print("[bold red]Error:[/bold red] At least 2 outcomes are required.")
-            break
+
+# ---------------------------------------------------------------------------
+# Interactive setup helpers (legacy path only)
+# ---------------------------------------------------------------------------
 
 
 def _interactive_flow(
     prefill_title: str,
-    prefill_outcomes: str | None,
     prefill_ground_truth: dict[str, int] | None,
-) -> tuple[str, list[str], dict[str, int] | None]:
+) -> tuple[str, dict[str, int] | None]:
     """Run the interactive TUI flow using manual setup or market services."""
     from miniprophet.cli.components.forecast_setup import prompt_forecast_params
 
@@ -230,27 +287,22 @@ def _interactive_flow(
         default="1",
     )
 
-    prefill_outcomes_list = (
-        [o.strip() for o in prefill_outcomes.split(",") if o.strip()] if prefill_outcomes else []
-    )
-
     if choice == "2":
-        prefill_title, prefill_outcomes_list, prefill_ground_truth = _fetch_kalshi()
+        prefill_title, _, prefill_ground_truth = _fetch_kalshi()
     elif choice == "3":
-        prefill_title, prefill_outcomes_list, prefill_ground_truth = _fetch_polymarket()
+        prefill_title, _, prefill_ground_truth = _fetch_polymarket()
     elif choice == "4":
         result = _browse_history()
         if result is not None:
-            prefill_title, prefill_outcomes_list, prefill_ground_truth = result
+            prefill_title, prefill_ground_truth = result
 
     return prompt_forecast_params(
         prefill_title=prefill_title,
-        prefill_outcomes=prefill_outcomes_list,
         prefill_ground_truth=prefill_ground_truth,
     )
 
 
-def _browse_history() -> tuple[str, list[str], dict[str, int] | None] | None:
+def _browse_history() -> tuple[str, dict[str, int] | None] | None:
     """Browse forecast history and return selected entry data or None."""
     from miniprophet.cli.components.forecast_history import browse_history_interactive
 

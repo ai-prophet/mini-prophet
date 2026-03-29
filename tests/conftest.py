@@ -14,7 +14,7 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from miniprophet.environment.source_board import Source  # noqa: E402
+from miniprophet.environment.source_registry import Source  # noqa: E402
 from miniprophet.tools.search import SearchResult  # noqa: E402
 
 
@@ -89,28 +89,15 @@ class DummyModel:
         return {"info": {"config": {"model": {"model_name": self.config.model_name}}}}
 
 
-class DummyBoard:
-    def __init__(self) -> None:
-        self._serialized: list[dict] = []
-
-    def render(self) -> str:
-        return "<source_board>(dummy)</source_board>"
-
-    def serialize(self) -> list[dict]:
-        return list(self._serialized)
-
-
 class DummyEnvironment:
     """Environment stub that returns scripted outputs."""
 
-    def __init__(self, outputs: list[dict] | None = None, with_board: bool = True) -> None:
+    def __init__(self, outputs: list[dict] | None = None) -> None:
         self.outputs = list(outputs or [])
         self.executed: list[tuple[dict, dict]] = []
         self._tools = {
             "search": {"type": "function", "function": {"name": "search", "parameters": {}}}
         }
-        if with_board:
-            self.board = DummyBoard()
 
     async def execute(self, action: dict, **kwargs) -> dict:
         self.executed.append((action, kwargs))
@@ -125,7 +112,7 @@ class DummyEnvironment:
         return self._tools.get(name)
 
     def serialize_sources_state(self) -> dict:
-        return {"sources": {}, "source_board": []}
+        return {"sources": {}}
 
     def serialize(self) -> dict:
         return {"info": {"config": {"environment": "dummy"}}}

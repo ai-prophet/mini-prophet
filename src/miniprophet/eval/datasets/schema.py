@@ -18,7 +18,7 @@ class ForecastTaskRow(BaseModel):
     task_id: str | None = None
     title: str
     context: str | None = None
-    outcomes: list[str]
+    outcomes: list[str] = Field(default_factory=lambda: ["Yes", "No"])
     ground_truth: dict[str, int] | None = None
     predict_by: str | None = None
     source: str | None = None

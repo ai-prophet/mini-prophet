@@ -14,7 +14,7 @@ from typing import Any
 import requests
 import trafilatura
 
-from miniprophet.environment.source_board import Source
+from miniprophet.environment.source_registry import Source
 from miniprophet.exceptions import SearchAuthError, SearchNetworkError, SearchRateLimitError
 from miniprophet.tools.search import SearchResult
 

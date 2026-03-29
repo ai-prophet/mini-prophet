@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from miniprophet.environment.source_board import SourceBoard
+from miniprophet.environment.source_registry import SourceRegistry
 from miniprophet.exceptions import Submitted
 
 SUBMIT_SCHEMA = {
@@ -10,33 +10,38 @@ SUBMIT_SCHEMA = {
     "function": {
         "name": "submit",
         "description": (
-            "Submit your final probabilistic forecast. Provide a probability "
-            "(between 0 and 1) for EVERY listed outcome. The probabilities should "
-            "reflect the balance of evidence gathered on your source board."
+            "Submit your final forecast as a single probability P(Yes) between 0 and 1. "
+            "If the question is not a valid binary yes/no question, submit probability=0."
         ),
         "parameters": {
             "type": "object",
             "properties": {
-                "probabilities": {
-                    "type": "object",
+                "probability": {
+                    "type": "number",
                     "description": (
-                        "A JSON object mapping each outcome name (exactly as listed) "
-                        "to a probability value between 0 and 1."
+                        "A number between 0 and 1 representing the probability "
+                        "that the answer is Yes."
+                    ),
+                },
+                "rationale": {
+                    "type": "string",
+                    "description": (
+                        "A brief summary of the key factors and reasoning "
+                        "behind your probability estimate."
                     ),
                 },
             },
-            "required": ["probabilities"],
+            "required": ["probability", "rationale"],
         },
     },
 }
 
 
 class SubmitTool:
-    """Validates and submits the final forecast."""
+    """Validates and submits the final binary forecast."""
 
-    def __init__(self, outcomes: list[str], board: SourceBoard) -> None:
-        self._outcomes = outcomes
-        self._board = board
+    def __init__(self, registry: SourceRegistry) -> None:
+        self._registry = registry
 
     @property
     def name(self) -> str:
@@ -49,36 +54,30 @@ class SubmitTool:
         return self._execute_impl(args)
 
     def _execute_impl(self, args: dict) -> dict:
-        probabilities = args.get("probabilities")
-        if not isinstance(probabilities, dict):
+        probability = args.get("probability")
+        if not isinstance(probability, int | float):
             return {
-                "output": "Error: 'probabilities' must be a JSON object mapping outcomes to values.",
+                "output": "Error: 'probability' must be a number between 0 and 1.",
+                "error": True,
+            }
+        if not (0 <= probability <= 1):
+            return {
+                "output": f"Error: probability must be between 0 and 1, got {probability}.",
                 "error": True,
             }
 
-        errors: list[str] = []
-        for outcome in self._outcomes:
-            if outcome not in probabilities:
-                errors.append(f"Missing probability for outcome: '{outcome}'.")
-        for key, val in probabilities.items():
-            if key not in self._outcomes:
-                errors.append(f"Unknown outcome: '{key}'.")
-            elif not isinstance(val, int | float) or not (0 <= val <= 1):
-                errors.append(
-                    f"Probability for '{key}' must be a number between 0 and 1, got {val}."
-                )
+        rationale = args.get("rationale", "")
 
-        if errors:
-            return {"output": "Submission rejected:\n" + "\n".join(errors), "error": True}
-
+        submission = {"Yes": float(probability), "No": round(1 - float(probability), 10)}
         raise Submitted(
             {
                 "role": "exit",
                 "content": "Forecast submitted successfully.",
                 "extra": {
                     "exit_status": "submitted",
-                    "submission": probabilities,
-                    "board": self._board.serialize(),
+                    "submission": submission,
+                    "rationale": rationale,
+                    "sources": self._registry.serialize(),
                 },
             }
         )

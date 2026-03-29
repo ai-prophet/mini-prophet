@@ -1,4 +1,4 @@
-"""Search tool: web search with source ID assignment."""
+"""Search tool: web search with source ID assignment via SourceRegistry."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from miniprophet.environment.source_board import Source
+from miniprophet.environment.source_registry import Source, SourceRegistry, render_source_preview
 from miniprophet.exceptions import SearchAuthError, SearchError
 from miniprophet.tools.search import SearchBackend, SearchResult
 
@@ -31,7 +31,7 @@ SEARCH_SCHEMA = {
         "name": "search",
         "description": (
             "Search the web for information relevant to the forecasting problem. "
-            "Returns a list of sources with titles, snippets, and article content. "
+            "Returns a list of sources with titles and gist summaries. "
             "Each source is assigned a global ID (S1, S2, ...) that persists across searches."
         ),
         "parameters": BASE_SEARCH_PARAMETERS_SCHEMA,
@@ -41,27 +41,26 @@ SEARCH_SCHEMA = {
 
 class SearchToolConfig(BaseModel):
     search_results_limit: int = 5
-    max_source_display_chars: int = 2000
 
 
 class SearchForecastTool:
-    """Wraps a SearchBackend into a forecast Tool with source ID tracking."""
+    """Wraps a SearchBackend into a forecast Tool with SourceRegistry-based ID tracking."""
 
     def __init__(
         self,
         search_backend: SearchBackend,
-        source_registry: dict[str, Source],
+        registry: SourceRegistry,
         *,
         search_limit: int = 10,
+        problem_id: str = "main",
         config: SearchToolConfig | None = None,
     ) -> None:
         self._backend = search_backend
-        self._source_registry = source_registry
+        self._registry = registry
         self._search_limit = search_limit
+        self._problem_id = problem_id
         self._config = config or SearchToolConfig()
-        self._next_source_id: int = 1
         self.n_searches: int = 0
-        self.last_search_results: list[tuple[str, Source]] = []
 
     @property
     def name(self) -> str:
@@ -74,29 +73,8 @@ class SearchForecastTool:
             schema["function"]["parameters"] = backend_parameters  # type: ignore
         return schema
 
-    def _assign_source_id(self, source: Source) -> str:
-        sid = f"S{self._next_source_id}"
-        self._next_source_id += 1
-        self._source_registry[sid] = source
-        return sid
-
-    def serialize_sources(self) -> dict[str, dict[str, Any]]:
-        """Return all discovered sources keyed by stable source_id (S1, S2, ...)."""
-        items = sorted(
-            self._source_registry.items(),
-            key=lambda kv: (
-                int(kv[0][1:]) if kv[0].startswith("S") and kv[0][1:].isdigit() else 10**9
-            ),
-        )
-        return {
-            sid: {
-                "url": src.url,
-                "title": src.title,
-                "snippet": src.snippet,
-                "date": src.date,
-            }
-            for sid, src in items
-        }
+    async def _assign_source_id(self, source: Source) -> str:
+        return await self._registry.add(source, problem_id=self._problem_id)
 
     async def execute(self, args: dict) -> dict:
         query = args.get("query", "").strip()
@@ -107,7 +85,9 @@ class SearchForecastTool:
             return {
                 "output": (
                     f"Search limit reached ({self._search_limit} queries). "
-                    "Use your existing sources to submit a forecast."
+                    "You can still use `read_source` to read the full text of sources "
+                    "you have already found, or `list_sources` to review them. "
+                    "Then submit your forecast."
                 ),
                 "error": True,
             }
@@ -128,19 +108,28 @@ class SearchForecastTool:
             }
 
         self.n_searches += 1
-        self.last_search_results = [(self._assign_source_id(src), src) for src in result.sources]
 
-        if not self.last_search_results:
+        # Assign IDs and collect results
+        search_results: list[tuple[str, Source]] = []
+        for src in result.sources:
+            sid = await self._assign_source_id(src)
+            search_results.append((sid, src))
+
+        if not search_results:
             body = "No sources found for this query."
         else:
-            lines: list[str] = [f'<search_results count="{len(self.last_search_results)}">']
-            for sid, src in self.last_search_results:
-                date_line = f"Date: {src.date or 'No date info'}\n"
+            lines: list[str] = [f'<search_results count="{len(search_results)}">']
+            for sid, src in search_results:
+                entry = await self._registry.get(sid)
                 lines.append(
-                    f'<result id="{sid}" title="{src.title}" url="{src.url}">\n'
-                    f"{date_line}"
-                    f"Snippet: {src.snippet}\n"
-                    f"</result>"
+                    render_source_preview(
+                        source_id=sid,
+                        title=src.title,
+                        url=src.url,
+                        date=src.date,
+                        gist=entry.gist,
+                        full_length=len(src.snippet),
+                    )
                 )
             lines.append("</search_results>")
             body = "\n".join(lines)
@@ -148,7 +137,7 @@ class SearchForecastTool:
         return {
             "output": body,
             "search_cost": result.cost,
-            "search_results": self.last_search_results,
+            "search_results": search_results,
         }
 
     def display(self, output: dict) -> None:
@@ -157,6 +146,6 @@ class SearchForecastTool:
 
         search_results = output.get("search_results", [])
         if not output.get("error") and search_results:
-            print_search_observation(search_results, self._config.max_source_display_chars)
+            print_search_observation(search_results, self._registry.max_gist_chars)
         else:
             print_observation(output)

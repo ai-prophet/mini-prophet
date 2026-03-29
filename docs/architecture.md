@@ -85,5 +85,5 @@ This is how run-level date bounds reach backend-specific search filters.
 - `CliForecastAgent`: CLI display hooks
 - `EvalBatchAgentWrapper`: eval progress + rate-limit coordination
 - `ForecastEnvironment`: tool dispatcher
-- `SourceBoard`: invariant evidence state
+- `SourceRegistry`: async-safe evidence store
 - `TrajectoryRecorder`: per-step replayable trace

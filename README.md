@@ -110,6 +110,37 @@ prophet datasets validate -f examples/example_batch_job.jsonl
 
 Run artifacts now include `sources.json` in addition to `info.json` and `trajectory.json`.
 
+## Preview: Planning Phase (`dev` branch)
+
+The `dev` branch includes a new **planning phase** that runs before execution.
+Instead of immediately searching, the agent first produces a structured XML plan
+that decomposes the question into sub-queries, sub-problems, and factors to consider.
+You review and approve the plan before any research (and cost) begins.
+
+```bash
+# Switch to the dev branch
+git checkout dev
+pip install -e ".[perplexity]"
+
+# Run with planning enabled (default on dev)
+prophet run \
+  --title "Will the Lakers beat the Warriors tomorrow night?" \
+  --model-class openrouter \
+  --model gemini/gemini-3-flash-preview
+
+# Planning is on by default. To disable it:
+prophet run \
+  --title "Will it rain in SF tomorrow?" \
+  -c planning.enabled=false
+```
+
+The agent will:
+1. Enter a **planning phase** — analyze the question and submit a plan
+2. Display the plan as a tree and ask for your approval
+3. Enter the **execution phase** — follow the plan, search, and submit a probability
+
+The `dev` branch also includes an experimental Textual TUI (`--tui` flag).
+
 ## Contributing
 
 Contributor-facing testing and CI notes live in [CONTRIBUTING.md](CONTRIBUTING.md).
