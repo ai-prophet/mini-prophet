@@ -229,3 +229,6 @@ scripts/
 
 # Refactor plans
 .refactor_plans/
+
+# ai-prophet integration
+ai_prophet_integration/*.json

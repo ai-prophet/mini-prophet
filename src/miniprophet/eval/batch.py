@@ -87,7 +87,11 @@ async def _process_problem(
 ) -> tuple[ForecastResult, bool]:
     """Process one problem. Returns (result, done). done=False means retry."""
     from miniprophet.agent.context import get_context_manager
-    from miniprophet.environment.forecast_env import ForecastEnvironment, create_default_tools
+    from miniprophet.environment.forecast_env import (
+        ForecastEnvironment,
+        create_default_tools,
+        create_planning_tools,
+    )
     from miniprophet.environment.source_registry import SourceRegistry
 
     task_id = problem.task_id
@@ -117,7 +121,8 @@ async def _process_problem(
             search_limit=agent_search_limit,
             search_results_limit=search_cfg.get("search_results_limit", 5),
         )
-        env = ForecastEnvironment(tools, registry=registry)
+        planning_tools = create_planning_tools()
+        env = ForecastEnvironment(tools, planning_tools=planning_tools, registry=registry)
 
         cm_cfg = config.get("context_manager", {})
         ctx_mgr = get_context_manager(cm_cfg)

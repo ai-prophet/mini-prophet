@@ -45,7 +45,7 @@ hf = [
 ]
 
 [project.scripts]
-prophet = "miniprophet.run.app:app"
+miniprophet = "miniprophet.run.app:app"
 
 [tool.setuptools.packages.find]
 where = ["src"]
